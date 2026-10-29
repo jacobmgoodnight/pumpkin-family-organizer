@@ -1,0 +1,35 @@
+/* Narrow-screen layout polish. Override existing flex rules without changing desktop layout. */
+@media screen and (max-width:700px){
+ .toolbar-tail{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;min-width:0}
+ .toolbar-tail .stat{font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+ #catalog-area .toolbar-tail>.top-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch;min-width:0;width:100%}
+ #catalog-area .toolbar-tail .sort-inline{grid-column:1/-1;display:grid!important;grid-template-columns:max-content minmax(0,1fr);align-items:center;min-width:0;max-width:100%;width:100%;gap:9px;white-space:normal}
+ #catalog-area .toolbar-tail .sort-inline select{width:100%;min-width:0;max-width:none!important;box-sizing:border-box;min-height:44px;font-size:14px}
+ #catalog-area .toolbar-tail #surprise,#catalog-area .toolbar-tail #clear-filters{min-width:0;min-height:44px;max-width:100%;width:100%;box-sizing:border-box;margin:0;overflow-wrap:break-word;white-space:normal;line-height:1.25}
+ #catalog-area .toolbar-tail #surprise{grid-column:1}
+ #catalog-area .toolbar-tail #clear-filters{grid-column:2}
+ #catalog-area .filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px;min-width:0}
+ #catalog-area .filters>.control:first-child{grid-column:1/-1}
+ #catalog-area .filters>.control:not(:first-child){grid-column:auto;min-width:0}
+ #catalog-area .filters>.control:not(:first-child)>label{min-height:40px;align-items:flex-end;line-height:1.2}
+ #catalog-area .filters .control select,#catalog-area .filters .control input{font-size:16px;max-width:100%;box-sizing:border-box}
+ #catalog-area .filters .search-help{font-size:11px;line-height:1.35}
+ #cloud-family-panel{padding:12px!important;box-sizing:border-box;max-width:100%}
+ #cloud-family-panel #cloud-email-form{max-width:100%!important;gap:9px!important;grid-template-columns:1fr!important;align-items:stretch!important}
+ #cloud-family-panel #cloud-email-form input{min-width:0!important;width:100%;box-sizing:border-box;font-size:16px}
+ #cloud-family-panel #cloud-email-form button{width:100%;min-height:44px}
+ #cloud-family-panel #cloud-password-setup input{min-width:0!important;width:100%;box-sizing:border-box}
+ .pf-panel .pf-search{display:grid!important;grid-template-columns:1fr 1fr;gap:8px}
+ .pf-panel .pf-search input{grid-column:1/-1;width:100%;min-width:0;box-sizing:border-box;font-size:16px}
+ .pf-panel .pf-search button,.pf-panel .pf-search a{min-width:0;text-align:center;padding:10px}
+ .pf-panel-header button{min-height:40px}
+ .pf-modal{box-sizing:border-box;width:min(96vw,640px)!important;padding:14px!important}
+ .pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+ .pf-card{min-width:0}
+ .pf-card nav button,.pf-card nav a{min-height:40px}
+ .heart{min-width:44px;min-height:44px}
+}
+@media screen and (max-width:365px){
+ .pf-card nav{flex-direction:column}
+ .pf-card nav button,.pf-card nav a{width:100%;box-sizing:border-box}
+}
