@@ -314,10 +314,10 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
      async function onSession(session){
-       if(!session?.user){owner=null;outbox=[];urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
+       if(!session?.user){owner=null;outbox=[];last=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
        urls.clear();urlsUntil=0;
-       owner=session.user.id;outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
+       owner=session.user.id;last=clone(bridge.snapshot());outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
        try{
          await seed();if(outbox.length)await flushOutbox();await refresh();ui(true);
          if(!previewObserver){previewObserver=new MutationObserver(schedulePreviews);previewObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});}
