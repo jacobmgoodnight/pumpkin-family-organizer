@@ -267,9 +267,13 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    finally{save.disabled=false;}
  });
  // Signed image URLs work only after personal-use thumbnails are uploaded to private Storage.
- const urls=new Map();
+ const urls=new Map();let urlsUntil=0,previewObserver=null;
  async function loadPreviews(){
    if(!owner)return;
+   if(Date.now()>=urlsUntil){
+     urls.clear();urlsUntil=Date.now()+45*60*1000;
+     document.querySelectorAll('img[data-pumpkin-path]').forEach(img=>{img.dataset.pumpkinSigned='';});
+   }
    const found=[...document.images].filter(img=>{
      const raw=img.getAttribute('src')||'';
      if(/^(Thumbnails|Additional_Thumbnails)\//.test(raw)&&img.dataset.pumpkinPath!==raw){
@@ -293,12 +297,13 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
      async function onSession(session){
-       if(!session?.user){owner=null;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
+       if(!session?.user){owner=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
+       urls.clear();urlsUntil=0;
        owner=session.user.id;status('Loading family choices…');
        try{
          await seed();await refresh();ui(true);
-         new MutationObserver(schedulePreviews).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+         if(!previewObserver){previewObserver=new MutationObserver(schedulePreviews);previewObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});}
          if(channel)await client.removeChannel(channel);
          channel=client.channel('pc-changes-'+owner)
            .on('postgres_changes',{event:'*',schema:'public',table:'pc_choices',filter:'user_id=eq.'+owner},requestRefresh)
@@ -313,9 +318,11 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      await onSession(data?.session);
      addEventListener('online',()=>{if(owner)refresh()});
      addEventListener('focus',()=>{if(owner){refresh();schedulePreviews();}});
+     setInterval(()=>{if(owner)schedulePreviews()},20*60*1000);
    }catch(e){status('Cloud unavailable: '+e.message,true);console.error(e);ui(false);}
  }
 
+ window.addEventListener('pumpkin:cloudrefresh',()=>{if(owner)requestRefresh()});
  // -- Original PDF locator ----------------------------------------------------
  // The catalog's source paths refer to actual Zombie Pumpkins folders;
  // the pretty in-organizer category paths are NOT those originals.
@@ -388,10 +395,10 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    printDialog.showModal();
  },true);
  function updateOriginalLabels(){
-   document.querySelectorAll('a.pdf').forEach(a=>{if(a.textContent!=='Find original ↗')a.textContent='Find original ↗'});
+   document.querySelectorAll('a.pdf').forEach(a=>{if(!/^https:\/\//i.test(a.getAttribute('href')||'')&&a.textContent!=='Find original ↗')a.textContent='Find original ↗'});
    const preview=document.getElementById('preview-original');
-   if(preview&&preview.textContent.startsWith('Open original'))preview.textContent='Find original file ↗';
-   if(preview&&preview.textContent.startsWith('Open PDF'))preview.textContent='Find original PDF ↗';
+   if(preview&&!/^https:\/\//i.test(preview.getAttribute('href')||'')&&preview.textContent.startsWith('Open original'))preview.textContent='Find original file ↗';
+   if(preview&&!/^https:\/\//i.test(preview.getAttribute('href')||'')&&preview.textContent.startsWith('Open PDF'))preview.textContent='Find original PDF ↗';
  }
  const labelsObserver=new MutationObserver(()=>updateOriginalLabels());
  labelsObserver.observe(document.body,{subtree:true,childList:true});
@@ -432,6 +439,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      const [z,a]=await Promise.all([folderCount('Thumbnails'),folderCount('Additional_Thumbnails')]);
      if(sequence!==countRequest)return;
      const number=z+a;
+     galleryState.style.display=number>=expectedImages?'none':'flex';
      galleryMessage.textContent=number>=expectedImages
        ?'✓ All '+number.toLocaleString()+' thumbnails are stored privately and available across signed-in family devices.'
        :number
@@ -458,7 +466,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  folderInput.type='file';folderInput.multiple=true;folderInput.hidden=true;folderInput.setAttribute('webkitdirectory','');folderInput.setAttribute('directory','');
  const uploadProgress=document.createElement('p');uploadProgress.setAttribute('aria-live','polite');
  uploadDetails.append(uploadSummary,uploadDesc,rights,folderButton,folderInput,uploadProgress);
- panel.append(uploadDetails);
+ accountSettings.append(uploadDetails);
  const oldUi=ui;
  ui=connected=>{
    oldUi(connected);uploadDetails.hidden=!connected;galleryState.hidden=!connected;
@@ -466,7 +474,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(connected){updateGalleryCount();}else{countRequest++;}
  };
  galleryAction.addEventListener('click',()=>{
-   uploadDetails.open=true;
+   accountSettings.open=true;uploadDetails.open=true;
    uploadDetails.scrollIntoView({behavior:'smooth',block:'center'});
  });
  folderButton.addEventListener('click',()=>{

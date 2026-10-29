@@ -3,10 +3,12 @@ export function init({getClient,getOwner,bridge}){
  const $=id=>document.getElementById(id),client=()=>getClient(),owner=()=>getOwner();
  const safeUrl=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:""}catch{return""}};
  const make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el};
- const style=make("style");style.textContent=".pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 15px}.pf-actions button,.pf-panel button,.pf-modal button{cursor:pointer;background:#34483b;border:1px solid #70866c;color:#f2eee4;padding:9px 12px;border-radius:9px;font-weight:650}.pf-actions .pf-primary,.pf-modal button[type=submit],.pf-panel .pf-primary{background:#bb773e;color:#151d18;border-color:#e3ab73}.pf-panel{border:1px solid #58735e;border-radius:15px;background:#1a2b21;padding:15px;margin-bottom:16px}.pf-panel h3{margin:0 0 8px}.pf-panel a{color:#edb887}.pf-search{display:flex;gap:8px;flex-wrap:wrap}.pf-search input{flex:1;min-width:160px;background:#0f1b14;color:#fff;border:1px solid #6a826e;border-radius:9px;padding:10px}.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:13px}.pf-card{background:#263a2b;border:1px solid #526e57;border-radius:11px;padding:9px;min-width:0}.pf-card img{width:100%;height:150px;object-fit:contain;background:#101c14;border-radius:6px}.pf-card strong{display:block;font-size:13px;margin:6px 0;overflow-wrap:anywhere}.pf-card small{display:block;color:#bed0bc;margin:6px 0}.pf-card nav{display:flex;gap:5px;flex-wrap:wrap}.pf-card nav a,.pf-card nav button{font-size:12px;border:1px solid #65836b;color:#f9f2de;background:#354b3a;padding:7px;border-radius:6px;text-decoration:none}.pf-modal{border:1px solid #6c896c;border-radius:14px;background:#1d2c23;color:#f4ecdf;padding:20px;width:min(92vw,640px);max-height:85vh;overflow:auto}.pf-modal::backdrop{background:#000b}.pf-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pf-form label{display:grid;gap:5px;font-weight:600;font-size:13px}.pf-form input{background:#0c1912;border:1px solid #668369;border-radius:8px;color:white;padding:10px;min-width:0;width:100%;box-sizing:border-box}.pf-form .wide{grid-column:1/-1}.pf-note{font-size:13px;color:#ccdace;line-height:1.5}@media(max-width:560px){.pf-form{grid-template-columns:1fr}.pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.append(style);
+ const style=make("style");style.textContent=".pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 15px}.pf-actions button,.pf-panel button,.pf-modal button{cursor:pointer;background:#34483b;border:1px solid #70866c;color:#f2eee4;padding:9px 12px;border-radius:9px;font-weight:650}.pf-actions .pf-primary,.pf-modal button[type=submit],.pf-panel .pf-primary{background:#bb773e;color:#151d18;border-color:#e3ab73}.pf-panel{border:1px solid #58735e;border-radius:15px;background:#1a2b21;padding:15px;margin-bottom:16px}.pf-panel h3{margin:0 0 8px}.pf-panel a{color:#edb887}.pf-search{display:flex;gap:8px;flex-wrap:wrap}.pf-search input{flex:1;min-width:160px;background:#0f1b14;color:#fff;border:1px solid #6a826e;border-radius:9px;padding:10px}.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:13px}.pf-card{background:#263a2b;border:1px solid #526e57;border-radius:11px;padding:9px;min-width:0}.pf-card img{width:100%;height:150px;object-fit:contain;background:#101c14;border-radius:6px}.pf-card strong{display:block;font-size:13px;margin:6px 0;overflow-wrap:anywhere}.pf-card small{display:block;color:#bed0bc;margin:6px 0}.pf-card nav{display:flex;gap:5px;flex-wrap:wrap}.pf-card nav a,.pf-card nav button{font-size:12px;border:1px solid #65836b;color:#f9f2de;background:#354b3a;padding:7px;border-radius:6px;text-decoration:none}.pf-modal{border:1px solid #6c896c;border-radius:14px;background:#1d2c23;color:#f4ecdf;padding:20px;width:min(92vw,640px);max-height:85vh;overflow:auto}.pf-modal::backdrop{background:#000b}.pf-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pf-form label{display:grid;gap:5px;font-weight:600;font-size:13px}.pf-form input{background:#0c1912;border:1px solid #668369;border-radius:8px;color:white;padding:10px;min-width:0;width:100%;box-sizing:border-box}.pf-form .wide{grid-column:1/-1}.pf-note{font-size:13px;color:#ccdace;line-height:1.5}.pf-more{position:relative;align-self:center}.pf-more summary{cursor:pointer;color:#d5d8c7;padding:9px;border:1px solid #536f58;border-radius:8px;font-size:13px}.pf-more[open]{border:1px solid #526e57;background:#1a2b21;border-radius:9px;padding:5px}.pf-more button{margin:5px 5px 0 0}.pf-more summary::marker{color:#dfa878}@media(max-width:560px){.pf-form{grid-template-columns:1fr}.pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.append(style);
  const actions=make("div","pf-actions");
  const importBtn=make("button","pf-primary","＋ Import pattern"),webBtn=make("button","","🌐 Find more online"),ideasBtn=make("button","","♡ Saved web ideas"),manageBtn=make("button","","Manage imports"),helpBtn=make("button","","Help");
- actions.append(importBtn,webBtn,ideasBtn,manageBtn,helpBtn);
+ const libraryTools=make("details","pf-more"),toolSummary=make("summary","","Library tools");
+libraryTools.append(toolSummary,ideasBtn,manageBtn,helpBtn);
+actions.append(importBtn,webBtn,libraryTools);
  (document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
  // Search all collections by default; curated Zombie Pumpkins still wins close relevance ties.
  const initialSource=$("source");if(initialSource&&initialSource.value==="zombie"){initialSource.value="";initialSource.dispatchEvent(new Event("change",{bubbles:true}));}
@@ -26,12 +28,12 @@ export function init({getClient,getOwner,bridge}){
  const difficulty=input("Difficulty (optional)");difficulty.maxLength=40;
  const link=input("Original source webpage (optional)","url");link.maxLength=1500;
  const preview=input("Preview image (JPG / PNG / WebP)","file");preview.accept=".jpg,.jpeg,.png,.webp";
- const printable=input("Printable file (PDF / image)","file");printable.accept=".pdf,.jpg,.jpeg,.png,.webp";
+ const printable=input("Printable file (PDF / image)","file");printable.accept=".pdf,.jpg,.jpeg,.png,.webp";printable.required=true;
  const rights=make("label","wide"),check=document.createElement("input");check.type="checkbox";check.required=true;check.style.width="18px";
  rights.style.cssText="display:flex;gap:8px;flex-direction:row;align-items:start";rights.append(check,document.createTextNode("I have permission to store these selected files privately for our family. Web search previews are not automatically downloaded."));form.append(rights);
  const submit=make("button","wide","Upload and add pattern");submit.type="submit";const formStatus=make("p","pf-note wide");formStatus.setAttribute("aria-live","polite");form.append(submit,formStatus);dialog.append(form);document.body.append(dialog);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
- let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,cache=new Map(),cacheUntil=0;
+ let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
  const openImport=src=>{if(!owner()){alert("Connect a parent account first.");return;}form.reset();category.value="Family imports";webSource=src||null;if(src){title.value=src.title||"";link.value=src.sourceUrl||src.source_url||"";tags.value="pumpkin, carving";}formStatus.textContent=src?"Download an authorized printable file from the source website, then choose that file here.":"Choose your printable PDF/image and optional preview.";dialog.showModal();title.focus()};
  const webUrl=()=>{google.href="https://www.google.com/search?tbm=isch&q="+encodeURIComponent(webInput.value.trim()+" pumpkin carving stencil printable")};
  const openWeb=q=>{panel.hidden=false;webInput.value=q||$("search")?.value||"";webUrl();panel.scrollIntoView({behavior:"smooth",block:"nearest"})};
@@ -118,7 +120,7 @@ export function init({getClient,getOwner,bridge}){
        if(saved.error)console.warn("Could not clear old favorites",saved.error);
        const paths=[row.thumbnail_path,row.original_path].filter(Boolean);
        if(paths.length){const result=await client().storage.from("pc-family-imports").remove([...new Set(paths)]);if(result.error)console.warn("File cleanup incomplete:",result.error);}
-       await refreshImports();showImports();
+       await refreshImports();window.dispatchEvent(new Event("pumpkin:cloudrefresh"));showImports();
      });
      nav.append(edit,remove);
    }
@@ -134,11 +136,12 @@ export function init({getClient,getOwner,bridge}){
    if(error)throw Error(label+": "+error.message);return path;
  }
  form.addEventListener("submit",async e=>{
-   e.preventDefault();if(!owner())return;
+   e.preventDefault();if(!owner()||submit.disabled)return;
    const previewFile=preview.files[0],originalFile=printable.files[0];
-   if(!previewFile&&!originalFile){formStatus.textContent="Choose a printable file or a preview image.";return}
+   if(!originalFile){formStatus.textContent="Choose an original printable PDF or image. A thumbnail alone is not a carving template.";return}
    if(link.value&&!safeUrl(link.value)){formStatus.textContent="Source link must be https://";return}
    if(!check.checked){formStatus.textContent="Confirm permission before uploading.";return}
+   if(cloudRows.some(row=>row.name.trim().toLowerCase()===title.value.trim().toLowerCase())&&!confirm("A family import already has this title. Add another copy?"))return;
    submit.disabled=true;formStatus.textContent="Uploading privately…";const id=crypto.randomUUID(),uploaded=[];
    try{
      let p=await put(previewFile,id,"preview",imageTypes);if(p)uploaded.push(p);
@@ -168,7 +171,7 @@ export function init({getClient,getOwner,bridge}){
    return cache;
  }
  async function refreshImports(){
-   if(loading||!owner())return;loading=true;const uid=owner();
+   if(loading){refreshQueued=true;return;}if(!owner())return;loading=true;const uid=owner();
    try{const {data,error}=await client().from("pc_imports").select("*").eq("user_id",uid).order("created_at",{ascending:false}).limit(2000);
      if(error)throw error;if(uid!==owner())return;cloudRows=data||[];
      const links=await signed(cloudRows.flatMap(r=>[r.thumbnail_path,r.original_path]));if(uid!==owner())return;
@@ -178,11 +181,11 @@ export function init({getClient,getOwner,bridge}){
        path:links.get(r.original_path)||"",source:"family",pages:1,cloud_id:r.id
      })));
      importBtn.textContent="＋ Import pattern";manageBtn.textContent="Manage imports"+(cloudRows.length?" ("+cloudRows.length+")":"");
-   }catch(err){console.error("Could not load family imports",err)}finally{loading=false}
+   }catch(err){console.error("Could not load family imports",err);manageBtn.title="Could not refresh imports: "+err.message;}finally{loading=false;if(refreshQueued){refreshQueued=false;void refreshImports()}}
  }
  async function connect(){
    const uid=owner();if(!uid)return;
-   if(userId!==uid){userId=uid;if(channel)client()?.removeChannel(channel);
+   if(userId!==uid){userId=uid;cache.clear();cacheUntil=0;ideas=[];cloudRows=[];if(channel)client()?.removeChannel(channel);
      channel=client().channel("pc-library-"+uid)
        .on("postgres_changes",{event:"*",schema:"public",table:"pc_imports",filter:"user_id=eq."+uid},refreshImports)
        .on("postgres_changes",{event:"*",schema:"public",table:"pc_web_ideas",filter:"user_id=eq."+uid},fetchIdeas).subscribe();
@@ -192,6 +195,7 @@ export function init({getClient,getOwner,bridge}){
  window.addEventListener("focus",()=>{if(owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
  window.addEventListener("pumpkin:cloudready",connect);
- window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
+ setInterval(()=>{if(owner())refreshImports()},25*60*1000);
+ window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;cache.clear();cacheUntil=0;cloudRows=[];bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
  if(owner())connect();
 }

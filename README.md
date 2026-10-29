@@ -1,5 +1,18 @@
 # Goodnight Family Pumpkin Organizer 🎃
 
+## Reliability update — October 29, 2026
+
+The latest code includes the family-import bridge and the Family Imports collection in the main gallery. This update strengthens the shared workflow:
+
+- Importing requires a printable PDF/image; a thumbnail alone cannot create an unprintable design. A matching title prompts a duplicate warning.
+- Built-in thumbnails and family-import file links refresh their short-lived private URLs while the app is open, and cached URLs are cleared when the signed-in account changes.
+- Imported private PDFs/images retain their **Open original** links instead of being mislabeled as local-only files. The original licensed catalog still uses the local original-file locator.
+- Removing an import requests a fresh cloud choice sync; rapid realtime changes also queue another import refresh rather than being discarded.
+- The top-level gallery actions remain simple; manage imports, saved ideas, and help are grouped under **Library tools**. Thumbnail-upload administration lives in **Family account settings** and no longer shows a permanent setup banner when the 2,053 original previews are present.
+
+**Verification:** JavaScript source syntax and Supabase schema, RLS, private buckets and realtime publication were inspected. An authenticated browser test across actual family devices and a real file upload/print are still needed; this update should not be mistaken for completed device-to-device acceptance testing. Embedded Google Images search still requires `SERPAPI_KEY` to be configured privately in Supabase.
+
+
 ## Family imports and Google Images discovery — October 2026
 
 The online organizer now has **Import pattern**, **Manage imports**, **More patterns online**, and **Saved web ideas** above the gallery.
