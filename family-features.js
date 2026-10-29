@@ -52,12 +52,13 @@ actions.append(importBtn,webBtn,libraryTools);
  quickImport.style.cssText="border:1px solid #668369;border-radius:10px;padding:10px;background:#17271c";
  const quickPreview=make("img");quickPreview.hidden=true;
  quickPreview.style.cssText="width:100%;height:auto;max-height:150px;object-fit:contain;border-radius:6px;background:#0d1911";
- const quickStatus=make("p","pf-note");quickStatus.setAttribute("aria-live","polite");
+ const quickStatus=make("p","pf-note");quickStatus.setAttribute("aria-live","polite");quickStatus.style.fontWeight="650";
  const quickLinks=make("div");quickLinks.style.cssText="display:flex;flex-wrap:wrap;gap:8px;align-items:center";
- const retryImage=make("button","","Try automatic image import"),openImage=make("a","","Open original image ↗"),openSource=make("a","","Visit pattern source ↗");
- retryImage.type="button";
+ const retryImage=make("button","","Retry original image"),chooseLocal=make("button","","Choose file from phone or computer"),openImage=make("a","","Open original image ↗"),openSource=make("a","","Visit pattern source ↗");
+ retryImage.type="button";chooseLocal.type="button";
+ chooseLocal.addEventListener("click",()=>printable.click());
  for(const a of [openImage,openSource]){a.target="_blank";a.rel="noopener noreferrer";a.style.color="#edb887";}
- quickLinks.append(retryImage,openImage,openSource);quickImport.append(quickPreview,quickStatus,quickLinks);
+ quickLinks.append(chooseLocal,retryImage,openImage,openSource);quickImport.append(quickPreview,quickStatus,quickLinks);
  form.append(quickImport);
  const rights=make("label","wide"),check=document.createElement("input");check.type="checkbox";check.required=true;check.style.width="18px";
  rights.style.cssText="display:flex;gap:8px;flex-direction:row;align-items:start";rights.append(check,document.createTextNode("I have permission to upload these selected or retrieved files privately for our family. No file is uploaded until I confirm."));form.append(rights);
@@ -106,10 +107,10 @@ actions.append(importBtn,webBtn,libraryTools);
            bitmap.close();
          }catch{}
        }
-       quickStatus.textContent="Original image ready ("+(file.size/1048576).toFixed(1)+" MB). Check permission below and select Upload and add pattern."+quality;
+       quickStatus.textContent="✓ Full-size original staged ("+(file.size/1048576).toFixed(1)+" MB). Nothing has been uploaded. Confirm permission, then select Upload and add pattern."+quality;
      }catch(e){
        if(attempt!==importAttempt||!dialog.open)return;
-       quickStatus.textContent="Automatic original-image download wasn't allowed by this site. Open original image or source, save the printable file, then choose it above.";
+       quickStatus.textContent="Automatic import blocked (often by website CORS restrictions). No printable file was imported. Open original image or Visit pattern source, save the printable image/PDF, then select Choose file from phone or computer.";
      }
    }
    if(attempt!==importAttempt||!dialog.open)return;
@@ -126,7 +127,7 @@ actions.append(importBtn,webBtn,libraryTools);
  retryImage.addEventListener("click",()=>{stagedOriginal=null;stagedPreview=null;printable.required=true;void tryImageImport()});
  printable.addEventListener("change",()=>{
    if(printable.files[0]&&quickImport.hidden===false)
-     quickStatus.textContent="Selected "+printable.files[0].name+". This file will be used as the printable original. The optional preview can be left blank for JPG/PNG/WebP.";
+     quickStatus.textContent="✓ Your file is selected: "+printable.files[0].name+". It will be used as the printable original when you approve upload. The preview is optional for JPG/PNG/WebP.";
  });
  dialog.addEventListener("close",()=>{importAttempt++;retryImage.disabled=false;});
  const openImport=src=>{
@@ -145,9 +146,9 @@ actions.append(importBtn,webBtn,libraryTools);
      openImage.href=imageOriginalUrl||imagePreviewUrl||link.value||"#";
      openImage.hidden=!(imageOriginalUrl||imagePreviewUrl);
      openSource.href=link.value||"#";openSource.hidden=!safeUrl(link.value);
-     retryImage.disabled=false;quickStatus.textContent="Preparing image import…";
+     retryImage.disabled=false;quickStatus.textContent=imageOriginalUrl?"Checking if the full-size original allows downloads…":"This result has no direct full-size image URL. Save a printable from the source and choose that file.";
    }
-   formStatus.textContent=src?"The original image may be imported automatically if its website permits downloads. PDFs still need to be selected manually. Nothing uploads until you confirm permission.":"Choose your printable PDF/image and optional preview.";
+   formStatus.textContent=src?"Trying to stage the full-size original, never just the small Google thumbnail. If blocked, save the original and use Choose file from phone or computer. PDFs must be selected manually. Upload only after confirming permission.":"Choose your printable PDF/image and optional preview.";
    dialog.showModal();title.focus();
    if(src)void tryImageImport();
  };
