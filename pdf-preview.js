@@ -12,7 +12,7 @@ export async function makePdfThumbnail(file){
    const pdf=await task.promise;if(!pdf.numPages)throw Error("PDF has no pages.");
    const page=await pdf.getPage(1),initial=page.getViewport({scale:1});
    const scale=Math.min(2,780/initial.width,980/initial.height);
-   if(!(scale>0)&&Number.isFinite(scale))throw Error("Invalid PDF page.");
+   if(!Number.isFinite(scale)||scale<=0)throw Error("Invalid PDF page.");
    const viewport=page.getViewport({scale}),canvas=document.createElement("canvas");
    canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
    const ctx=canvas.getContext("2d",{alpha:false});if(!ctx)throw Error("Canvas unavailable.");

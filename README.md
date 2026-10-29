@@ -2,6 +2,8 @@
 
 [**Open the family organizer**](https://jacobmgoodnight.github.io/pumpkin-family-organizer/) · [**Supabase project**](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn)
 
+**Quick links:** [Family instructions](FAMILY_GUIDE.md) · [Developer setup and security](DEVELOPER_SETUP.md) · [Schema inventory](supabase/SCHEMA_BASELINE.md) · [Automated tests](.github/workflows/validate.yml)
+
 A private-to-the-family pumpkin-carving planner hosted on GitHub Pages. Browse **2,053 built-in patterns**, compare favorites, and choose each family member's final carving design. The public GitHub repository contains the app's code and catalog metadata, **not the licensed original PDFs or thumbnails**.
 
 ## What works today
@@ -105,4 +107,8 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 
 **Engineering checks completed:** Repository bridge and feature wiring reviewed; private buckets and their uploaded preview counts checked; schema RLS and realtime publication reviewed; JavaScript syntax checked. There is still one Supabase Auth advisory about disabled leaked-password protection (which may depend on plan). [Supabase security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 
-**Still to acceptance-test:** PDF first-page rendering on a real family browser and metadata/thumbnail editing on a signed-in account, plus  A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, expansion of 48-image responses with a live SerpApi search, and the new best-effort browser auto-fetch/import flow against real image hosts. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.
+**Still to acceptance-test:** PDF first-page rendering and metadata/thumbnail editing on a real signed-in family device;  A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, expansion of 48-image responses with a live SerpApi search, and the new best-effort browser auto-fetch/import flow against real image hosts. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.
+
+## Automated validation and schema notes
+
+The repository now includes dependency-free Node.js smoke tests in `tests/` and a GitHub Actions workflow that checks catalog counts/unique IDs, core offline search behavior, print-action routing, JavaScript syntax and privacy invariants. Run `npm test` with Node.js 22+. CI does **not** need Supabase or SerpApi secrets and does not perform production writes. See [the technical setup guide](DEVELOPER_SETUP.md) for release validation. The schema inventory in [supabase/SCHEMA_BASELINE.md](supabase/SCHEMA_BASELINE.md) describes the inspected live database; it is **not** a destructive migration to rerun in production.
