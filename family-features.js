@@ -17,6 +17,7 @@ actions.append(importBtn,webBtn,libraryTools);
  const searchLine=make("div","pf-search"),webInput=document.createElement("input"),findBtn=make("button","pf-primary","Search Google Images"),google=make("a","","Open Google Images ↗");
  webInput.type="search";webInput.placeholder="e.g. Hello Kitty";webInput.setAttribute("aria-label","Search web patterns");
  google.target="_blank";google.rel="noopener noreferrer";searchLine.append(webInput,findBtn,google);panel.append(searchLine);
+ const providerNotice=make("p","pf-note");providerNotice.hidden=true;panel.append(providerNotice);
  const feedback=make("p","pf-note");feedback.setAttribute("aria-live","polite");const grid=make("div","pf-grid");panel.append(feedback,grid);actions.after(panel);
  const dialog=make("dialog","pf-modal"),close=make("button","","Close ✕"),titleHeader=make("h2","","Import pattern to family library");
  close.type="button";close.style.float="right";dialog.append(close,titleHeader,make("p","pf-note","Upload a PDF or printable image. An optional preview makes it easy to recognize in search. Files stay private to your signed-in family."));
@@ -35,8 +36,28 @@ actions.append(importBtn,webBtn,libraryTools);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
  const openImport=src=>{if(!owner()){alert("Connect a parent account first.");return;}form.reset();category.value="Family imports";webSource=src||null;if(src){title.value=src.title||"";link.value=src.sourceUrl||src.source_url||"";tags.value="pumpkin, carving";}formStatus.textContent=src?"Download an authorized printable file from the source website, then choose that file here.":"Choose your printable PDF/image and optional preview.";dialog.showModal();title.focus()};
+ let providerConfigured=null,providerChecking=false;
+ async function checkSearchConnection(){
+   if(!owner()||!client()||providerChecking)return;
+   providerChecking=true;
+   try{
+     const {data,error}=await client().functions.invoke("pumpkin-image-search",{body:{action:"status"}});
+     if(error||typeof data?.configured!=="boolean")throw Error("Status unavailable");
+     providerConfigured=data.configured;
+     if(!providerConfigured){
+       providerNotice.replaceChildren(document.createTextNode("In-app Google Images needs a free SerpApi key. "));
+       const keyLink=make("a","","Get free key");
+       keyLink.href="https://serpapi.com/manage-api-key";keyLink.target="_blank";keyLink.rel="noopener noreferrer";
+       const setupLink=make("a","","Add key in Supabase");
+       setupLink.href="https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn";setupLink.target="_blank";setupLink.rel="noopener noreferrer";
+       providerNotice.append(keyLink,document.createTextNode(" · "),setupLink,document.createTextNode(" (Edge Functions → Secrets, name: SERPAPI_KEY). Or use Open Google Images."));
+       providerNotice.hidden=false;
+     }else providerNotice.hidden=true;
+   }catch{providerConfigured=null;providerNotice.hidden=true;}
+   finally{providerChecking=false;}
+ }
  const webUrl=()=>{google.href="https://www.google.com/search?tbm=isch&q="+encodeURIComponent(webInput.value.trim()+" pumpkin carving stencil printable")};
- const openWeb=q=>{panel.hidden=false;webInput.value=q||$("search")?.value||"";webUrl();panel.scrollIntoView({behavior:"smooth",block:"nearest"})};
+ const openWeb=q=>{panel.hidden=false;webInput.value=q||$("search")?.value||"";webUrl();void checkSearchConnection();panel.scrollIntoView({behavior:"smooth",block:"nearest"})};
  importBtn.addEventListener("click",()=>openImport(null));
  webBtn.addEventListener("click",()=>openWeb());
  ideasBtn.addEventListener("click",showIdeas);
@@ -64,6 +85,7 @@ actions.append(importBtn,webBtn,libraryTools);
    const term=webInput.value.trim();if(term.length<2){feedback.textContent="Enter at least 2 characters.";return;}
    webUrl();grid.replaceChildren();
    if(!owner()){feedback.textContent="Connect a parent account to search within the page, or open Google Images.";return;}
+   if(providerConfigured===false){feedback.textContent="Set SERPAPI_KEY in Supabase Edge Functions → Secrets, then refresh this app. The Open Google Images link works without a key.";return;}
    findBtn.disabled=true;feedback.textContent="Searching Google Images…";
    try{
      const {data,error}=await client().functions.invoke("pumpkin-image-search",{body:{query:term}});
@@ -85,7 +107,7 @@ actions.append(importBtn,webBtn,libraryTools);
    if(!error){ideas=data||[];ideasBtn.textContent="♡ Saved ideas ("+ideas.length+")";}
  }
  function showIdeas(){
-   if(!owner()){alert("Connect a parent account first.");return;}panel.hidden=false;grid.replaceChildren();
+   if(!owner()){alert("Connect a parent account first.");return;}panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=ideas.length?ideas.length+" saved source links. No files were copied.":"No saved ideas yet. Search the web to save some.";
    for(const idea of ideas){const nav=card({name:idea.title,image:idea.preview_url,source:idea.source_name,url:idea.source_url});
      const imp=make("button","","Import file…"),remove=make("button","","Remove");
@@ -97,7 +119,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  function showImports(){
    if(!owner()){alert("Connect the parent account first.");return;}
-   panel.hidden=false;grid.replaceChildren();
+   panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=cloudRows.length?cloudRows.length+" imported family templates. Rename or remove a pattern here. Removing also clears its saved favorites and final selections.":"No imports yet. Choose Import pattern to add a PDF or printable image.";
    for(const row of cloudRows){
      const previewUrl=cache.get(row.thumbnail_path)||"";

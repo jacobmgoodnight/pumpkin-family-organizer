@@ -1,123 +1,92 @@
 # Goodnight Family Pumpkin Organizer 🎃
 
-## Reliability update — October 29, 2026
+[**Open the family organizer**](https://jacobmgoodnight.github.io/pumpkin-family-organizer/) · [**Supabase project**](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn)
 
-The latest code includes the family-import bridge and the Family Imports collection in the main gallery. This update strengthens the shared workflow:
+A private-to-the-family pumpkin-carving planner hosted on GitHub Pages. Browse **2,053 built-in patterns**, compare favorites, and choose each family member's final carving design. The public GitHub repository contains the app's code and catalog metadata, **not the licensed original PDFs or thumbnails**.
 
-- Importing requires a printable PDF/image; a thumbnail alone cannot create an unprintable design. A matching title prompts a duplicate warning.
-- Built-in thumbnails and family-import file links refresh their short-lived private URLs while the app is open, and cached URLs are cleared when the signed-in account changes.
-- Imported private PDFs/images retain their **Open original** links instead of being mislabeled as local-only files. The original licensed catalog still uses the local original-file locator.
-- Removing an import requests a fresh cloud choice sync; rapid realtime changes also queue another import refresh rather than being discarded.
-- The top-level gallery actions remain simple; manage imports, saved ideas, and help are grouped under **Library tools**. Thumbnail-upload administration lives in **Family account settings** and no longer shows a permanent setup banner when the 2,053 original previews are present.
+## What works today
 
-**Verification:** JavaScript source syntax and Supabase schema, RLS, private buckets and realtime publication were inspected. An authenticated browser test across actual family devices and a real file upload/print are still needed; this update should not be mistaken for completed device-to-device acceptance testing. Embedded Google Images search still requires `SERPAPI_KEY` to be configured privately in Supabase.
+| Area | Implementation |
+| --- | --- |
+| Pattern catalog | 661 curated Zombie Pumpkins + 1,392 Additional Templates; original records left untouched |
+| Smart Search | Names, tags, keywords and 1,553 reviewed visual descriptions; curated results favored on close matches, not above clearly stronger matches |
+| Family profiles | Jacob, Shelby, Charlotte and Violet share one trusted adult Supabase login; kids do not need email |
+| Favorites & Final Picks | Person-specific selections stored in Supabase; Realtime listeners refresh connected devices |
+| Private thumbnails | **All 2,053 uploaded and verified in the private \`pc-previews\` bucket** (661 + 1,392; about 194 MiB) |
+| Family imports | Upload an authorized PDF or image to private storage with title, tags, category and optional preview; shown in the regular gallery, favorites and Final Picks |
+| Saved web ideas | Save source links and externally hosted preview references separately from actual printable imports |
+| Google Images discovery | Native-styled external-result cards through the deployed SerpApi Edge Function **once a private API key is configured** |
+| Home screen | Web-app manifest and SVG pumpkin icon; no offline service worker or guaranteed offline browsing |
+| Original catalog printing | Local file-path locator; licensed built-in originals are not accessible as PDFs on other devices |
+| Imported file printing | Authorized imported originals use time-limited private storage links; cross-device printing still needs real-world testing |
 
+**Important:** Presence in code and database is not the same as completed end-to-end testing. Real PDF uploads, phone/tablet access, two-device sync, and live paid/free image-provider responses have **not** been acceptance-tested with the family's devices.
 
-## Family imports and Google Images discovery — October 2026
+## Getting started
 
-The online organizer now has **Import pattern**, **Manage imports**, **More patterns online**, and **Saved web ideas** above the gallery.
+1. Open the [website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/).
+2. A parent signs in once on each device using the **same adult email and password**. If an existing email-link session does not yet have a password, set it first under **Family account settings → Set/change parent password** on a signed-in device.
+3. Pick **Jacob**, **Shelby**, **Charlotte**, or **Violet**. Each family member uses their own favorites and Final Picks without their own email address.
+4. Search **All templates**, or filter to **Zombie Pumpkins**, **Additional templates**, or **Family imports**.
+5. Use **Import pattern** for an authorized printable PDF/image. Use **Library tools** for **Manage imports**, **Saved ideas**, and **Help**.
 
-- **Import pattern:** on a signed-in computer, choose your own PDF or printable image and optionally a JPG/PNG/WebP preview. Add a title, category and search tags. Files go into the private `pc-family-imports` bucket, with metadata in `pc_imports`. A saved import appears in the regular template gallery, search, favorites and final picks on all connected devices.
-- **Manage imports:** rename an import or delete it after confirmation. Removing clears related favorites/final picks and attempts to remove the private file.
-- **Search more designs:** when library results are sparse, the existing Google search link becomes an in-page discovery panel. Results come from Google's Images index via SerpApi, clearly marked as web suggestions, with their source links.
-- **Save idea:** saves the source link/metadata, without mirroring a third-party picture or PDF. To turn it into a permanent pattern, download a file you are allowed to use from the source site and select **Import file**. Copyrighted images are not automatically copied.
-- **Search all collections:** the site searches curated, additional and family imports together by default. The curated Zombie Pumpkins tie-breaker is preserved.
-- **Home screen:** the website has a standalone web-app manifest and pumpkin icon. Add it to the Home Screen on supported mobile browsers. Offline gallery is not yet supported.
-- **Family Settings:** when signed in, technical account controls are collapsed inside the family-sync header. Pick Jacob/Shelby/Charlotte/Violet using the existing carver chooser.
+Supabase persists browser sessions, but sessions can expire or be cleared. An email magic-link fallback remains available and is rate-limited; the password method avoids repeated email delivery. Family profiles are convenience profiles under one authenticated household account, **not separately secured child accounts**. Avoid treating a carver selection as an authentication boundary.
 
-### One-time SerpApi setup (required for in-page Google results)
+### Pattern previews and storage
 
-1. Create or sign in to a [SerpApi account](https://serpapi.com/) and obtain your API key from [Your Account](https://serpapi.com/manage-api-key). The currently published free tier allows 250 successful searches/month.
-2. In the [Pumpkin Supabase project](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn), open **Edge Functions → Secrets** (or Project Settings → Edge Functions → Secrets, depending on dashboard layout).
-3. Add a secret named exactly `SERPAPI_KEY` and paste the key **there only**. Do not paste it into GitHub, your public browser code, or a chat.
-4. Save. The already-deployed Edge Function `pumpkin-image-search` automatically picks up the secret without needing redeployment.
-5. Refresh the website, search `Hello Kitty`, choose **More patterns online → Search Google Images**. The key never leaves the server function; results show preview/source cards.
+The account's private Supabase Storage already contains all 2,053 original preview images. **There is no need to upload them again.** If a future device reports missing previews, confirm it is signed into the same account, then refresh the page. A troubleshooting uploader is available in **Family account settings → Upload photos for all family devices**, but it should only be used for an actual missing/failed upload. Original licensed PDFs are not hosted publicly.
 
-The function is authenticated and caps image results at 12 per search, with an additional limit of 15 searches/hour and 40/day for the family account. These app-side limits do not replace the SerpApi plan quotas. Without a key, the external **Open Google Images** link remains usable.
+Family imports use the separate private \`pc-family-imports\` bucket. A printable PDF/image is required; an optional JPG, PNG or WebP thumbnail improves the gallery preview. Without a separate image thumbnail, imported PDFs use a pumpkin placeholder, not an automatically generated PDF preview. Supported uploads are limited to **20 MB per file**. Source attribution is optional, and duplicate titles produce a confirmation rather than automatic merging.
 
+## Google Images inside the app
 
+The **Find more online** action opens an inline panel of image-result cards. Searching the library remains free and local; a web-provider request is only sent when you explicitly select **Search Google Images**. If the current library search finds five or fewer results, a contextual "more designs" shortcut appears.
 
-[Open the family website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/)
+Once enabled, the in-app results include an externally hosted thumbnail, title, source website, **Open source**, **Save idea**, and **Import file**. The cards are visually integrated with the Halloween interface but remain **separate from the licensed pattern gallery** until the family uploads an authorized printable file. **Save idea** stores a source reference, not a permanent printable PDF. Remote thumbnails and third-party sites may disappear, block embedding, or be subject to copyrights. The app does not automatically download or republish them.
 
-A shared family pumpkin-carving catalog with **2,053 designs** and **1,553 visual descriptions**.
+### Free SerpApi setup (recommended)
 
-## Parent sign-in without repeated emails
+1. Sign up for a free account at [SerpApi](https://serpapi.com/users/sign_up).
+2. Copy the key from [Manage API Key](https://serpapi.com/manage-api-key).
+3. Open [this app's Supabase dashboard](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn) → **Edge Functions → Secrets**.
+4. Add a secret whose **name** is exactly \`SERPAPI_KEY\`; paste the key as its **value**. **Never place it in browser code, the public repo, issues, or chat.**
+5. Save the secret, reload the [family organizer](https://jacobmgoodnight.github.io/pumpkin-family-organizer/), search a subject such as "Hello Kitty", and click **Find more online → Search Google Images**.
 
-Supabase's built-in sender allows only **two auth emails per hour per project**. For regular household use, sign in with an **adult email + password** instead of requesting a fresh email link on every phone.
+The deployed \`pumpkin-image-search\` Edge Function uses Google Images via SerpApi, checks the authenticated user's family account, and returns **up to 12 cards per query**. It currently limits the household to **15 image searches per rolling hour and 40 per rolling day**. Provider quotas are independent. As of October 29, 2026, SerpApi advertises **250 free searches per month**; verify current plan terms at [SerpApi pricing](https://serpapi.com/). The app checks whether the server secret exists when you open web discovery, but a configured secret alone does not prove a successful provider search.
 
-1. On a phone or computer **already signed in** using the parent email link, open **Family sync → Set/change parent password**.
-2. Set a strong password of at least 12 characters. This updates the existing household account without clearing its four profiles or favorites.
-3. On a new device, enter that same adult email and password and select **Sign in with password**. No new email is sent.
-4. Let the child tap their name (Charlotte/Violet/etc.) to use their own profile. No child email or password needed.
-5. If no device is currently signed in and no password has been set, wait for the project-wide email quota to reset before requesting **one** email link, or configure custom SMTP; there is no instant bypass of Supabase's server-side limit.
+If the key is not configured, **Open Google Images** still launches the normal Google Images results in another tab, with no key. There is **no browser-only method for embedding arbitrary Google Images search results as reliable custom cards without an approved search provider**.
 
-The email-link fallback does not create a new user account and pauses repeat requests after the server reports a rate limit. Passwords are submitted directly to Supabase Auth; the organizer does not save them in its local favorites or repository.
+### Other image-search options (not enabled)
 
-## Simple family access
+- **Brave Image Search API:** Supports custom in-app cards, but these are Brave's index, **not Google Images**. Its current advertised Search plan is $5/1,000 requests with $5/month free credits, and requires its own credentials and server implementation. [Official pricing](https://brave.com/search/api/)
+- **Google Programmable Search Element:** Can embed an image-search experience with Google's own interface, rather than this app's custom result cards. Under Google's **January 20, 2026** changes, new engines must search selected sites (up to 50 domains); new unrestricted whole-web engines are unavailable. [Google announcement](https://programmablesearchengine.googleblog.com/2026/01/updates-to-our-web-search-products.html)
+- **Google Custom Search JSON API:** Closed to new customers and scheduled for transition by **January 1, 2027**. It is not a new-project alternative. [Google developer docs](https://developers.google.com/custom-search/v1/overview)
+- **Screen scraping Google Images from the browser:** Not implemented; fragile, prone to blocking, and unsuitable for a dependable family app.
 
-Children **do not need email accounts**. The parent uses one trusted household adult email to connect each phone or tablet once. Supabase remembers the signed-in device unless the family signs out or clears browser data. Kids simply choose their profile (Jacob, Shelby, Charlotte, or Violet) using the quick profile buttons at the top of the page.
+## How printing works
 
-A completely unauthenticated family-code login is **not enabled** because the artwork previews and selections are in private cloud storage. Public read access would make private artwork available outside your family.
+**Built-in patterns:** The site keeps original relative source paths and provides **Find original**. On a computer that has the purchased/licensed catalog, use the locator's **Set my local library folder** action, then copy the file path into Finder or Windows File Explorer. The root is the folder containing both \`Zombie Pumpkins\` and \`____Pumpkin_Complete_Family_Organizer_HD\`. Browsers on other devices cannot read files on that computer directly.
 
-## Why thumbnails are missing and how to fix them
+**Family imports:** An authorized imported PDF or image gets a short-lived signed URL to the private original file, letting the browser open it for printing. Imported originals are not published to GitHub. A separate image preview is recommended for PDF imports.
 
-The GitHub Pages repository intentionally does not contain the licensed thumbnails. On a Mac or PC that holds the organizer's actual image folders:
+The locally repaired \`START_HERE.html\` and any repair ZIPs distributed outside this repository are **not included in the GitHub Pages deployment**. This README does not claim they have been installed or audited on every device.
 
-1. Open the [website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/) and sign in using the trusted adult account.
-2. In the green **Family sync** panel, click **Upload thumbnails for everyone**. The panel shows how many of the 2,053 thumbnails are currently stored in your household's private bucket.
-3. Open **📷 Upload photos for all family devices**, confirm that you have permission to store those selected previews privately, and choose the folder named **Thumbnails**.
-4. Let that folder finish uploading. Repeat the process with **Additional_Thumbnails**. The total is approximately 194 MB; only small images are uploaded, not PDFs.
-5. Refresh the gallery on any signed-in family device. Images are delivered from authenticated, private Supabase Storage using short-lived URLs. No local image folders are needed on those devices.
+## Security and architecture
 
-If some items remain blank, look at the uploader's error summary. Re-selecting a folder can replace existing files to complete a partial transfer. A valid user session and permission confirmation are required for uploads.
+- **Frontend:** Static \`index.html\`, \`family-sync.js\`, \`family-features.js\` and \`cloud-config.js\`, hosted on GitHub Pages (public source).
+- **Cloud:** Supabase Auth, account-scoped Postgres RLS on \`pc_accounts\`, \`pc_people\`, \`pc_choices\`, \`pc_imports\`, \`pc_web_ideas\`, and \`pc_search_logs\`; realtime publication for the family-facing choice/import tables.
+- **Storage:** Both \`pc-previews\` and \`pc-family-imports\` are **private** and use account-scoped object paths; signed URLs have time limits.
+- **Image discovery:** Deployed \`pumpkin-image-search\` Edge Function calls SerpApi server-side, with a server-held \`SERPAPI_KEY\`. It uses gateway \`verify_jwt: false\` with **manual user token and family-account verification inside the function**; do not remove those internal checks.
+- **Credentials:** The frontend holds a publishable Supabase key, **never a service-role key or SerpApi key**. Passwords are handled by Supabase Auth.
+- **Limitations:** External thumbnails still load from their source hosts; arbitrary websites may block them. Do not automatically mirror third-party copyrighted images. No offline caching of licensed previews or signed URLs is implemented.
 
-## Features
+## Deploy and verify
 
-- Profiles for Jacob, Shelby, Charlotte, Violet and optional Family
-- Live family favorites and final picks, with account-scoped Supabase synchronization
-- Smart search, galleries, compare, and Google Images fallback
-- Private, opt-in thumbnail uploads under **Family sync → Add private thumbnail folders**
-- Original-file locator for patterns stored on your own Mac/PC
-- Original licensed PDFs are **not** published by this repository
+- GitHub Pages: [settings](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages) → deploy \`main\` branch, repository root.
+- Supabase Auth: [URL configuration](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration) → allow \`https://jacobmgoodnight.github.io/pumpkin-family-organizer/\` for sign-in redirects.
+- Supabase secrets: [project dashboard](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn) → Edge Functions → Secrets → optional \`SERPAPI_KEY\`.
+- No credentials or private original PDF/thumbnail files should be committed.
 
-## Family setup
+**Engineering checks completed:** Repository bridge and feature wiring reviewed; private buckets and their uploaded preview counts checked; schema RLS and realtime publication reviewed; JavaScript syntax checked. There is still one Supabase Auth advisory about disabled leaked-password protection (which may depend on plan). [Supabase security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 
-1. Use the same **trusted household adult email** on each device to sign in with an email link. There are no separate child login accounts.
-2. After sign-in shows **Synced ✓**, select a family profile and favorite a design. Check the same profile on another device.
-3. To populate images, on a Mac/PC open **Add private thumbnail folders** (Family sync panel), affirm that you have permission to store the selected previews, and upload **Thumbnails**, then **Additional_Thumbnails**, separately.
-4. The private Supabase Storage bucket `pc-previews` is account scoped and not public. The image files never enter this public repository.
-5. On the website, **Find original** shows the real source collection and a copyable file path. The first time, click **Set my local library folder** and point it to the directory containing both `Zombie Pumpkins` and `____Pumpkin_Complete_Family_Organizer_HD`.
-
-**Important:** Web browsers cannot directly open `file://` paths to another computer's drive. The online site currently locates originals only; it does not host PDFs or enable remote PDF printing.
-
-## Local PDF link repair
-
-In the local `START_HERE.html`, original Zombie Pumpkins PDFs are under `../Zombie Pumpkins/<original publisher collection>/<filename>.pdf` relative to the organizer folder. The category paths formerly used for PDF links were virtual organizer groupings, not the actual source folders.
-
-The standalone `Pumpkin_PDF_Original_Links_Upgrade.zip` installer is provided separately in ChatGPT. It fixes the local HTML without copying PDFs. It also includes `Audit_Original_Files.py` to check all 2,053 file paths on your actual drive and report mismatches. The catalog retains Dolly Parton locally.
-
-## Technical/security notes
-
-- Static site: GitHub Pages (source public)
-- Sync: Supabase Auth, Postgres with RLS, and Realtime
-- Private preview bucket: Supabase Storage; users can upload/read in their own account folder only
-- Browser configuration uses a **publishable key**, never a service-role/secret key
-- Favorites in a local browser stay separate until you sign in; see **Merge favorites from this device** when needed
-- The complete library of images and PDF files remains on your computer until you explicitly choose to store authorized previews privately. Verify your pattern licenses before uploading previews.
-- The web experience is not guaranteed to work offline.
-
-## Deployment settings
-
-- [GitHub Pages settings](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages): deploy **main / root**
-- [Supabase Auth URL settings](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration): Site URL and Redirect URL `https://jacobmgoodnight.github.io/pumpkin-family-organizer/`
-
-## Deployment status
-
-- [x] GitHub repository and Supabase database configured
-- [x] Account-upsert RLS policy added to resolve first sign-in error
-- [x] Private authenticated image-upload policies
-- [x] Web print locator and explicit user-initiated thumbnail uploader
-- [ ] Re-test first family sign-in on a real device
-- [ ] Test two-device real-time favorites
-- [ ] Upload permission-appropriate private previews from the user's Mac/PC
-- [ ] Confirm original-file audit and printing from the locally fixed organizer
+**Still to acceptance-test:** A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, and a successful in-page Google Images query after a key is saved. Avoid claiming those tests have passed without real results.
