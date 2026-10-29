@@ -1,5 +1,29 @@
 # Goodnight Family Pumpkin Organizer 🎃
 
+## Family imports and Google Images discovery — October 2026
+
+The online organizer now has **Import pattern**, **Manage imports**, **More patterns online**, and **Saved web ideas** above the gallery.
+
+- **Import pattern:** on a signed-in computer, choose your own PDF or printable image and optionally a JPG/PNG/WebP preview. Add a title, category and search tags. Files go into the private `pc-family-imports` bucket, with metadata in `pc_imports`. A saved import appears in the regular template gallery, search, favorites and final picks on all connected devices.
+- **Manage imports:** rename an import or delete it after confirmation. Removing clears related favorites/final picks and attempts to remove the private file.
+- **Search more designs:** when library results are sparse, the existing Google search link becomes an in-page discovery panel. Results come from Google's Images index via SerpApi, clearly marked as web suggestions, with their source links.
+- **Save idea:** saves the source link/metadata, without mirroring a third-party picture or PDF. To turn it into a permanent pattern, download a file you are allowed to use from the source site and select **Import file**. Copyrighted images are not automatically copied.
+- **Search all collections:** the site searches curated, additional and family imports together by default. The curated Zombie Pumpkins tie-breaker is preserved.
+- **Home screen:** the website has a standalone web-app manifest and pumpkin icon. Add it to the Home Screen on supported mobile browsers. Offline gallery is not yet supported.
+- **Family Settings:** when signed in, technical account controls are collapsed inside the family-sync header. Pick Jacob/Shelby/Charlotte/Violet using the existing carver chooser.
+
+### One-time SerpApi setup (required for in-page Google results)
+
+1. Create or sign in to a [SerpApi account](https://serpapi.com/) and obtain your API key from [Your Account](https://serpapi.com/manage-api-key). The currently published free tier allows 250 successful searches/month.
+2. In the [Pumpkin Supabase project](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn), open **Edge Functions → Secrets** (or Project Settings → Edge Functions → Secrets, depending on dashboard layout).
+3. Add a secret named exactly `SERPAPI_KEY` and paste the key **there only**. Do not paste it into GitHub, your public browser code, or a chat.
+4. Save. The already-deployed Edge Function `pumpkin-image-search` automatically picks up the secret without needing redeployment.
+5. Refresh the website, search `Hello Kitty`, choose **More patterns online → Search Google Images**. The key never leaves the server function; results show preview/source cards.
+
+The function is authenticated and caps image results at 12 per search, with an additional limit of 15 searches/hour and 40/day for the family account. These app-side limits do not replace the SerpApi plan quotas. Without a key, the external **Open Google Images** link remains usable.
+
+
+
 [Open the family website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/)
 
 A shared family pumpkin-carving catalog with **2,053 designs** and **1,553 visual descriptions**.
