@@ -65,7 +65,7 @@ actions.append(importBtn,webBtn,libraryTools);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
  let stagedOriginal=null,stagedPreview=null,imageOriginalUrl="",imagePreviewUrl="",importAttempt=0;
- const normalizeTitle=s=>String(s||"").normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const normalizeTitle=s=>String(s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  const imageTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
  async function fetchAuthorizedImage(url,maxBytes=20*1024*1024){
    if(!safeUrl(url)||url.length>2000)throw Error("No usable HTTPS image link was provided");
