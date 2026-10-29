@@ -21,7 +21,7 @@ Deno.serve(async(req)=>{
  if(memberError||!membership)return json({error:"Family account is not initialized"},403);
  let payload:any;try{payload=await req.json();}catch{return json({error:"Invalid JSON"},400);}
  const apiKey=Deno.env.get("SERPAPI_KEY")||"";
- if(payload?.action==="status")return json({configured:!!apiKey,provider:"SerpApi",maxResults:12});
+ if(payload?.action==="status")return json({configured:!!apiKey,provider:"SerpApi",maxResults:48});
  const term=typeof payload?.query==="string"?payload.query.trim().replace(/\s+/g," "):"";
  if(term.length<2||term.length>80)return json({error:"Search for 2–80 characters"},400);
  if(!apiKey)return json({error:"Google Images is not connected. Add SERPAPI_KEY in Supabase Edge Function Secrets.",code:"missing_key"},503);
@@ -49,7 +49,7 @@ Deno.serve(async(req)=>{
      thumbnail:safeUrl(x.thumbnail),
      sourceUrl:safeUrl(x.link),
      originalImageUrl:safeUrl(x.original)
-   })).filter((x:any)=>x.thumbnail&&x.sourceUrl).slice(0,12);
+   })).filter((x:any)=>x.thumbnail&&x.sourceUrl).slice(0,48);
    return json({query:term,results,provider:"Google Images via SerpApi"});
  }catch(error){return json({error:"Image search temporarily unavailable",code:"network_error"},503);}
 });

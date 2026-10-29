@@ -523,4 +523,5 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  });
  start();
  import('./family-features.js').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
+ import('./search-suggestions.js').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
 }

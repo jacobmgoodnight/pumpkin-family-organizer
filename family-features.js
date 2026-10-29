@@ -18,7 +18,9 @@ actions.append(importBtn,webBtn,libraryTools);
  webInput.type="search";webInput.placeholder="e.g. Hello Kitty";webInput.setAttribute("aria-label","Search web patterns");
  google.target="_blank";google.rel="noopener noreferrer";searchLine.append(webInput,findBtn,google);panel.append(searchLine);
  const providerNotice=make("p","pf-note");providerNotice.hidden=true;panel.append(providerNotice);
- const feedback=make("p","pf-note");feedback.setAttribute("aria-live","polite");const grid=make("div","pf-grid");panel.append(feedback,grid);actions.after(panel);
+ const feedback=make("p","pf-note");feedback.setAttribute("aria-live","polite");const grid=make("div","pf-grid");panel.append(feedback,grid);
+ const moreImages=make("button","","Show more images");moreImages.type="button";moreImages.hidden=true;moreImages.style.marginTop="12px";panel.append(moreImages);
+ actions.after(panel);
  const dialog=make("dialog","pf-modal"),close=make("button","","Close ✕"),titleHeader=make("h2","","Import pattern to family library");
  close.type="button";close.style.float="right";dialog.append(close,titleHeader,make("p","pf-note","Upload a PDF or printable image. An optional preview makes it easy to recognize in search. Files stay private to your signed-in family."));
  const form=make("form","pf-form");
@@ -38,7 +40,7 @@ actions.append(importBtn,webBtn,libraryTools);
  const openImport=src=>{if(!owner()){alert("Connect a parent account first.");return;}form.reset();category.value="Family imports";webSource=src||null;if(src){title.value=src.title||"";link.value=src.sourceUrl||src.source_url||"";tags.value="pumpkin, carving";}formStatus.textContent=src?"Download an authorized printable file from the source website, then choose that file here.":"Choose your printable PDF/image and optional preview.";dialog.showModal();title.focus()};
  let providerConfigured=null,providerChecking=false;
  const recentSearches=new Map();
- let currentWebRequest=0,activeTerm="",panelMode="search";
+ let currentWebRequest=0,activeTerm="",panelMode="search",webResults=[],webShown=0,webTerm="";
  async function checkSearchConnection(){
    if(!owner()||!client()||providerChecking)return;
    providerChecking=true;
@@ -96,20 +98,30 @@ actions.append(importBtn,webBtn,libraryTools);
    },{onConflict:"user_id,source_url"});
    b.disabled=false;b.textContent=error?"Save failed":"♥ Saved idea";if(!error)await fetchIdeas();
  }
- function renderWebCards(results,term,reused=false){
-   grid.replaceChildren();
-   feedback.textContent=results.length
-     ?results.length+" results"+(reused?" · Reused recent results":"")+" · Open original sources before saving or importing."
-     :"No results found. Try the external Google Images link.";
-   for(const r of results){
+ function appendWebBatch(){
+   const batch=webResults.slice(webShown,webShown+12);
+   for(const r of batch){
      if(!safeUrl(r.thumbnail)||!safeUrl(r.sourceUrl))continue;
      const nav=card({name:r.title,image:r.thumbnail,source:r.source,url:r.sourceUrl});
      const save=make("button","","♡ Save idea"),imp=make("button","","Import file…");
-     save.addEventListener("click",()=>saveIdea(r,term,save));
+     save.addEventListener("click",()=>saveIdea(r,webTerm,save));
      imp.addEventListener("click",()=>openImport(r));
      nav.append(save,imp);
    }
+   webShown+=batch.length;
+   moreImages.hidden=webShown>=webResults.length;
+   moreImages.textContent="Show more images ("+(webResults.length-webShown)+" remaining)";
  }
+ function renderWebCards(results,term,reused=false){
+   grid.replaceChildren();
+   webResults=Array.isArray(results)?results:[];webShown=0;webTerm=term;
+   feedback.textContent=webResults.length
+     ?webResults.length+" images available"+(reused?" · Reused recent results":"")+" · Open original sources before saving or importing."
+     :"No results found. Try the external Google Images link.";
+   moreImages.hidden=true;
+   appendWebBatch();
+ }
+ moreImages.addEventListener("click",appendWebBatch);
  async function findWeb({reuse=false}={}){
    panelMode="search";
    const term=webInput.value.trim();
@@ -127,7 +139,7 @@ actions.append(importBtn,webBtn,libraryTools);
    if(activeTerm===key)return; // avoid duplicate concurrent API requests
    if(providerConfigured===false){grid.replaceChildren();feedback.textContent="Set SERPAPI_KEY in Supabase Edge Functions → Secrets, then refresh this app. The Open Google Images link works without a key.";return;}
    const request=++currentWebRequest;
-   activeTerm=key;findBtn.disabled=true;grid.replaceChildren();feedback.textContent="Searching Google Images…";
+   activeTerm=key;findBtn.disabled=true;grid.replaceChildren();moreImages.hidden=true;feedback.textContent="Searching Google Images…";
    try{
      const {data,error}=await client().functions.invoke("pumpkin-image-search",{body:{query:term}});
      if(error){const serverError=await error.context?.json?.().catch(()=>null);throw Error(serverError?.error||error.message)}
@@ -152,7 +164,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  function showIdeas(){
    if(!owner()){alert("Connect a parent account first.");return;}
-   panelMode="ideas";++currentWebRequest;activeTerm="";findBtn.disabled=false;
+   panelMode="ideas";++currentWebRequest;activeTerm="";findBtn.disabled=false;moreImages.hidden=true;
    panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=ideas.length?ideas.length+" saved source links. No files were copied.":"No saved ideas yet. Search the web to save some.";
    for(const idea of ideas){const nav=card({name:idea.title,image:idea.preview_url,source:idea.source_name,url:idea.source_url});
@@ -165,7 +177,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  function showImports(){
    if(!owner()){alert("Connect the parent account first.");return;}
-   panelMode="imports";++currentWebRequest;activeTerm="";findBtn.disabled=false;
+   panelMode="imports";++currentWebRequest;activeTerm="";findBtn.disabled=false;moreImages.hidden=true;
    panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=cloudRows.length?cloudRows.length+" imported family templates. Rename or remove a pattern here. Removing also clears its saved favorites and final selections.":"No imports yet. Choose Import pattern to add a PDF or printable image.";
    for(const row of cloudRows){
