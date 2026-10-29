@@ -51,6 +51,12 @@ test("Offline search retains fuzzy and synonym matching",()=>{
  assert.ok(search.searchScore(x,["kitty"],"kitty")>0);
  assert.ok(search.searchScore(x,["skeleton"],"skeleton")>search.searchScore(x,["skeletn"],"skeletn"));
 });
+test("Imported design names normalize accents and punctuation",()=>{
+ const start=features.indexOf("const normalizeTitle="),end=features.indexOf(";",start);
+ assert.ok(start>0);
+ const normalize=new Function(features.slice(start,end+1)+"return normalizeTitle;")();
+ assert.equal(normalize("Café-De-Ville"),normalize("cafe de ville"));
+});
 test("No plain browser links to protected original catalog",()=>{
  assert.ok(html.includes("function originalAction("));
  assert.ok(html.includes("details"));
