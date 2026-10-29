@@ -4,6 +4,18 @@
 
 A shared family pumpkin-carving catalog with **2,053 designs** and **1,553 visual descriptions**.
 
+## Parent sign-in without repeated emails
+
+Supabase's built-in sender allows only **two auth emails per hour per project**. For regular household use, sign in with an **adult email + password** instead of requesting a fresh email link on every phone.
+
+1. On a phone or computer **already signed in** using the parent email link, open **Family sync → Set/change parent password**.
+2. Set a strong password of at least 12 characters. This updates the existing household account without clearing its four profiles or favorites.
+3. On a new device, enter that same adult email and password and select **Sign in with password**. No new email is sent.
+4. Let the child tap their name (Charlotte/Violet/etc.) to use their own profile. No child email or password needed.
+5. If no device is currently signed in and no password has been set, wait for the project-wide email quota to reset before requesting **one** email link, or configure custom SMTP; there is no instant bypass of Supabase's server-side limit.
+
+The email-link fallback does not create a new user account and pauses repeat requests after the server reports a rate limit. Passwords are submitted directly to Supabase Auth; the organizer does not save them in its local favorites or repository.
+
 ## Simple family access
 
 Children **do not need email accounts**. The parent uses one trusted household adult email to connect each phone or tablet once. Supabase remembers the signed-in device unless the family signs out or clears browser data. Kids simply choose their profile (Jacob, Shelby, Charlotte, or Violet) using the quick profile buttons at the top of the page.
