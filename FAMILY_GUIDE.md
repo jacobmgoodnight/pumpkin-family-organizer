@@ -40,7 +40,7 @@ This app is a private family planner. Honor the creator's or publisher's rights 
 
 ## Sign in without a password
 
-Use the same **existing parent email address** used for this family organizer. **Send email sign-in link** does not need a password. If Supabase refuses OTP with “Signups not allowed for OTP,” check that the address is the already registered parent account; the app does not create new accounts. You can also select **Set up / reset password** to request a password-recovery email. If an existing device is still signed in, the parent can set a password under **Family account settings** without needing another email. Email sending is rate-limited.
+Use the same **existing parent email address** used for this family organizer. **Send email sign-in link** does not need a password. If Supabase refuses OTP with “Signups not allowed for OTP,” check that the address exactly matches the registered parent account in Supabase Auth → Users; this is the common cause when new signups are blocked. the app does not create new accounts. You can also select **Set up / reset password** to request a password-recovery email. If an existing device is still signed in, the parent can set a password under **Family account settings** without needing another email. Email sending is rate-limited.
 
 ## Import a Google image from your phone
 

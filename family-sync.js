@@ -246,7 +246,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
          localStorage.setItem(emailCooldownKey,String(Date.now()+5*60*1000));
          status('Too many authentication requests. Use your parent password, or try again later.',true);
        }else if(/signups? not allowed for otp|signup.*disabled|otp_disabled/i.test(error.message||'')||error.code==='otp_disabled'){
-         status('Email-link sign-in was refused. Check that the address is the existing parent account. OTP sign-in may also be restricted by Supabase.',true);
+         status('Email link rejected. This commonly means the entered email is not the existing parent account when new signups are disabled. Check the parent email in Supabase Auth → Users, then retry.',true);
          $('cloud-auth-hint').textContent='Try Set up / reset password with the same existing email. Keep public signups disabled.';
        }else status('Unable to send email link: '+error.message,true);
      }else{
