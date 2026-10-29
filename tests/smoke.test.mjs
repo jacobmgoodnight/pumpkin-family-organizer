@@ -68,3 +68,26 @@ test("No plain browser links to protected original catalog",()=>{
  assert.ok(!existsSync(new URL("../Templates/",import.meta.url)));
  assert.ok(!existsSync(new URL("../Thumbnails/",import.meta.url)));
 });
+
+test("Mobile layout assigns sort and action buttons separate grid cells",()=>{
+ const css=readFileSync(new URL("../mobile-polish.css",import.meta.url),"utf8");
+ assert.match(html,/href="mobile-polish\.css"/);
+ assert.match(css,/\.sort-inline\{grid-column:1\/-1/);
+ assert.match(css,/\.toolbar-tail #surprise\{grid-column:1\}/);
+ assert.match(css,/\.toolbar-tail #clear-filters\{grid-column:2\}/);
+ assert.match(css,/max-width:700px/);
+});
+test("Email login stays existing-account-only and supports password recovery",()=>{
+ assert.match(sync,/shouldCreateUser:false/);
+ assert.match(sync,/cloud-reset-password/);
+ assert.match(sync,/resetPasswordForEmail/);
+ assert.match(sync,/PASSWORD_RECOVERY/);
+ assert.match(sync,/signups\? not allowed for otp/);
+});
+test("Image import clearly separates staging, permission and upload",()=>{
+ assert.match(features,/fetchAuthorizedImage\(original\)/);
+ assert.match(features,/printable\.click\(\)/);
+ assert.match(features,/Nothing has been uploaded/);
+ assert.match(features,/Automatic import blocked/);
+ assert.match(features,/if\(!check\.checked\)/);
+});

@@ -112,3 +112,12 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 ## Automated validation and schema notes
 
 The repository now includes dependency-free Node.js smoke tests in `tests/` and a GitHub Actions workflow that checks catalog counts/unique IDs, core offline search behavior, print-action routing, JavaScript syntax and privacy invariants. Run `npm test` with Node.js 22+. CI does **not** need Supabase or SerpApi secrets and does not perform production writes. See [the technical setup guide](DEVELOPER_SETUP.md) for release validation. The schema inventory in [supabase/SCHEMA_BASELINE.md](supabase/SCHEMA_BASELINE.md) describes the inspected live database; it is **not** a destructive migration to rerun in production.
+
+
+## October 29: iPhone usability, sign-in and image importing
+
+- **Phone layout:** A dedicated `mobile-polish.css` prevents Sort by from overlapping Surprise me by placing Sort by on its own row and both actions in independent, touch-sized cells. Search stays full width; collection/theme selectors share a row on phones when possible. The login and online discovery panels also get safer widths and controls.
+- **Existing-family sign-in:** **Send email sign-in link** does not need a password and only permits an existing parent account (`shouldCreateUser:false`). The app now explains a signup/OTP refusal instead of suggesting a password is required. The new **Set up / reset password** option uses Supabase recovery emails and opens the password editor after a valid recovery callback. This does not enable public registration. A recovery request never proves the email is registered.
+- **Web-image import:** A successful CORS-permitted original-image fetch is explicitly marked **staged**, not uploaded. If the remote host blocks it, the dialog explains that nothing was imported and provides a **Choose file from phone or computer** button. Search preview images are not substituted as printable originals.
+
+These improvements have syntax/static checks in GitHub Actions; the exact iPhone layout, password recovery email delivery and different external hosts still require live acceptance testing.

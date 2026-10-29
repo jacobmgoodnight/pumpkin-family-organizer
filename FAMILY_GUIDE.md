@@ -36,3 +36,12 @@ For personal photos, publisher-supplied PDFs or other owned files, use **Import 
 - **Can't print a built-in design on a phone:** That phone cannot access the PDFs on another computer. Use the original-file locator on the computer holding the purchased/authorized collection.
 
 This app is a private family planner. Honor the creator's or publisher's rights before storing or sharing designs.
+
+
+## Sign in without a password
+
+Use the same **existing parent email address** used for this family organizer. **Send email sign-in link** does not need a password. If Supabase refuses OTP with “Signups not allowed for OTP,” check that the address is the already registered parent account; the app does not create new accounts. You can also select **Set up / reset password** to request a password-recovery email. If an existing device is still signed in, the parent can set a password under **Family account settings** without needing another email. Email sending is rate-limited.
+
+## Import a Google image from your phone
+
+Select **Import image** on a Google Images card. If the original can be fetched, you'll see **Full-size original staged**; it still hasn't been uploaded. Confirm permission and select **Upload and add pattern**. If the host blocks the fetch, open the source, save an authorized printable image/PDF to Photos or Files, then choose **Choose file from phone or computer** in the same import form. The little Google Images thumbnail is not automatically a usable printable.

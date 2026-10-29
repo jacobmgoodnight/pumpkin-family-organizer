@@ -59,3 +59,10 @@ GitHub Actions runs the same suite on commits/PRs. Tests cover the 661 + 1,392 b
 - The DB does not transact deletion of an import, its choice references and storage cleanup as one atomic operation. Use care around partial failures; a future owner-scoped transaction/RPC may help.
 - Private licensed built-in originals are not published. Web search previews are references, not permanent printables.
 - No full offline experience and no public cache of protected preview assets.
+
+
+## Authentication and iPhone UI (October 29, 2026)
+
+Email links use `signInWithOtp` with `shouldCreateUser: false`. For failures such as “Signups not allowed for OTP,” verify that the supplied address is the **existing confirmed family account**, OTP/email authentication is permitted in Supabase, and that the GitHub Pages URL is in Auth → URL Configuration. **Do not enable open registrations just to get email links working.** Password setup and resets use `resetPasswordForEmail`, an existing-account recovery redirect, `PASSWORD_RECOVERY` and authenticated `updateUser`. Default Supabase email limits still apply. Recovery responses deliberately do not reveal whether an address exists.
+
+The `mobile-polish.css` file is loaded after the inline styles and provides a grid rather than a wrapping flex row for Sort, Surprise and Clear filters. It also sizes inputs at 16px to avoid iPhone Safari zoom. Test at CSS viewport widths 320, 375, 390, 430 and 768 px. GitHub CI only validates CSS structure; it does not visually emulate Safari.
