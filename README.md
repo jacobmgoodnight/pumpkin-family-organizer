@@ -4,6 +4,24 @@
 
 A shared family pumpkin-carving catalog with **2,053 designs** and **1,553 visual descriptions**.
 
+## Simple family access
+
+Children **do not need email accounts**. The parent uses one trusted household adult email to connect each phone or tablet once. Supabase remembers the signed-in device unless the family signs out or clears browser data. Kids simply choose their profile (Jacob, Shelby, Charlotte, or Violet) using the quick profile buttons at the top of the page.
+
+A completely unauthenticated family-code login is **not enabled** because the artwork previews and selections are in private cloud storage. Public read access would make private artwork available outside your family.
+
+## Why thumbnails are missing and how to fix them
+
+The GitHub Pages repository intentionally does not contain the licensed thumbnails. On a Mac or PC that holds the organizer's actual image folders:
+
+1. Open the [website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/) and sign in using the trusted adult account.
+2. In the green **Family sync** panel, click **Upload thumbnails for everyone**. The panel shows how many of the 2,053 thumbnails are currently stored in your household's private bucket.
+3. Open **📷 Upload photos for all family devices**, confirm that you have permission to store those selected previews privately, and choose the folder named **Thumbnails**.
+4. Let that folder finish uploading. Repeat the process with **Additional_Thumbnails**. The total is approximately 194 MB; only small images are uploaded, not PDFs.
+5. Refresh the gallery on any signed-in family device. Images are delivered from authenticated, private Supabase Storage using short-lived URLs. No local image folders are needed on those devices.
+
+If some items remain blank, look at the uploader's error summary. Re-selecting a folder can replace existing files to complete a partial transfer. A valid user session and permission confirmation are required for uploads.
+
 ## Features
 
 - Profiles for Jacob, Shelby, Charlotte, Violet and optional Family
