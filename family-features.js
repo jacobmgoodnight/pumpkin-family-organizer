@@ -5,8 +5,8 @@ export function init({getClient,getOwner,bridge}){
  const make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el};
  const style=make("style");style.textContent=".pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 15px}.pf-actions button,.pf-panel button,.pf-modal button{cursor:pointer;background:#34483b;border:1px solid #70866c;color:#f2eee4;padding:9px 12px;border-radius:9px;font-weight:650}.pf-actions .pf-primary,.pf-modal button[type=submit],.pf-panel .pf-primary{background:#bb773e;color:#151d18;border-color:#e3ab73}.pf-panel{border:1px solid #58735e;border-radius:15px;background:#1a2b21;padding:15px;margin-bottom:16px}.pf-panel h3{margin:0 0 8px}.pf-panel a{color:#edb887}.pf-search{display:flex;gap:8px;flex-wrap:wrap}.pf-search input{flex:1;min-width:160px;background:#0f1b14;color:#fff;border:1px solid #6a826e;border-radius:9px;padding:10px}.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:13px}.pf-card{background:#263a2b;border:1px solid #526e57;border-radius:11px;padding:9px;min-width:0}.pf-card img{width:100%;height:150px;object-fit:contain;background:#101c14;border-radius:6px}.pf-card strong{display:block;font-size:13px;margin:6px 0;overflow-wrap:anywhere}.pf-card small{display:block;color:#bed0bc;margin:6px 0}.pf-card nav{display:flex;gap:5px;flex-wrap:wrap}.pf-card nav a,.pf-card nav button{font-size:12px;border:1px solid #65836b;color:#f9f2de;background:#354b3a;padding:7px;border-radius:6px;text-decoration:none}.pf-modal{border:1px solid #6c896c;border-radius:14px;background:#1d2c23;color:#f4ecdf;padding:20px;width:min(92vw,640px);max-height:85vh;overflow:auto}.pf-modal::backdrop{background:#000b}.pf-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pf-form label{display:grid;gap:5px;font-weight:600;font-size:13px}.pf-form input{background:#0c1912;border:1px solid #668369;border-radius:8px;color:white;padding:10px;min-width:0;width:100%;box-sizing:border-box}.pf-form .wide{grid-column:1/-1}.pf-note{font-size:13px;color:#ccdace;line-height:1.5}@media(max-width:560px){.pf-form{grid-template-columns:1fr}.pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.append(style);
  const actions=make("div","pf-actions");
- const importBtn=make("button","pf-primary","＋ Import pattern"),webBtn=make("button","","🌐 Find more online"),ideasBtn=make("button","","♡ Saved web ideas"),helpBtn=make("button","","Help");
- actions.append(importBtn,webBtn,ideasBtn,helpBtn);
+ const importBtn=make("button","pf-primary","＋ Import pattern"),webBtn=make("button","","🌐 Find more online"),ideasBtn=make("button","","♡ Saved web ideas"),manageBtn=make("button","","Manage imports"),helpBtn=make("button","","Help");
+ actions.append(importBtn,webBtn,ideasBtn,manageBtn,helpBtn);
  (document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
  const panel=make("section","pf-panel");panel.hidden=true;panel.append(make("h3","","Find more printable designs"));
  panel.append(make("p","pf-note","External results are suggestions, not part of your library. Check the original source and usage rights before importing."));
@@ -36,6 +36,7 @@ export function init({getClient,getOwner,bridge}){
  importBtn.addEventListener("click",()=>openImport(null));
  webBtn.addEventListener("click",()=>openWeb());
  ideasBtn.addEventListener("click",showIdeas);
+ manageBtn.addEventListener("click",showImports);
  helpBtn.addEventListener("click",()=>alert("Import local PDF/image files into the shared catalog, or search for ideas online. A web idea is only a source link; to make it a permanent carving template, download a file you are allowed to use and import it. The source and all original designs remain separate."));
  webInput.addEventListener("input",webUrl);
  window.addEventListener("pumpkin:searchweb",e=>openWeb(e.detail?.query||""));
@@ -87,6 +88,37 @@ export function init({getClient,getOwner,bridge}){
      imp.addEventListener("click",()=>openImport(idea));
      remove.addEventListener("click",async()=>{if(!confirm("Remove this saved idea?"))return;const {error}=await client().from("pc_web_ideas").delete().eq("user_id",owner()).eq("id",idea.id);if(!error){await fetchIdeas();showIdeas()}else alert(error.message)});
      nav.append(imp,remove);
+   }
+   panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }
+ function showImports(){
+   if(!owner()){alert("Connect the parent account first.");return;}
+   panel.hidden=false;grid.replaceChildren();
+   feedback.textContent=cloudRows.length?cloudRows.length+" imported family templates. Rename or remove a pattern here. Removing also clears its saved favorites and final selections.":"No imports yet. Choose Import pattern to add a PDF or printable image.";
+   for(const row of cloudRows){
+     const previewUrl=cache.get(row.thumbnail_path)||"";
+     const nav=card({name:row.name,image:previewUrl,source:row.category+" · Family library",url:row.source_url});
+     const edit=make("button","","Rename"),remove=make("button","","Delete");
+     edit.addEventListener("click",async()=>{
+       const proposed=prompt("Rename imported pattern:",row.name);
+       if(proposed===null)return;
+       const next=proposed.trim().slice(0,160);if(!next)return;
+       const {error}=await client().from("pc_imports").update({name:next,updated_at:new Date().toISOString()}).eq("id",row.id).eq("user_id",owner());
+       if(error)alert(error.message);else{await refreshImports();showImports()}
+     });
+     remove.addEventListener("click",async()=>{
+       if(!confirm("Permanently remove “"+row.name+"” from the family library and clear its favorites/final picks? This cannot be undone."))return;
+       remove.disabled=true;
+       const uid=owner();
+       const {error}=await client().from("pc_imports").delete().eq("id",row.id).eq("user_id",uid);
+       if(error){alert(error.message);remove.disabled=false;return;}
+       const saved=await client().from("pc_choices").delete().eq("user_id",uid).eq("template_id","family:"+row.id);
+       if(saved.error)console.warn("Could not clear old favorites",saved.error);
+       const paths=[row.thumbnail_path,row.original_path].filter(Boolean);
+       if(paths.length){const result=await client().storage.from("pc-family-imports").remove([...new Set(paths)]);if(result.error)console.warn("File cleanup incomplete:",result.error);}
+       await refreshImports();showImports();
+     });
+     nav.append(edit,remove);
    }
    panel.scrollIntoView({behavior:"smooth",block:"nearest"});
  }
@@ -143,7 +175,7 @@ export function init({getClient,getOwner,bridge}){
        tags:r.tags||[],keywords:r.tags||[],difficulty:r.difficulty||"",thumbnail:links.get(r.thumbnail_path)||placeholder,
        path:links.get(r.original_path)||"",source:"family",pages:1,cloud_id:r.id
      })));
-     importBtn.textContent="＋ Import pattern"+(cloudRows.length?" ("+cloudRows.length+")":"");
+     importBtn.textContent="＋ Import pattern";manageBtn.textContent="Manage imports"+(cloudRows.length?" ("+cloudRows.length+")":"");
    }catch(err){console.error("Could not load family imports",err)}finally{loading=false}
  }
  async function connect(){
