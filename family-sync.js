@@ -9,9 +9,10 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  const panel=document.createElement('section');
  panel.id='cloud-family-panel';panel.setAttribute('aria-label','Family sync');
  panel.innerHTML='<div class="cloud-line"><strong>Family sync</strong><span id="cloud-status">Connecting…</span></div>'+
- '<form id="cloud-email-form" hidden><label for="cloud-email">Parent email (device setup only)</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><button type="submit">Connect this device</button></form>'+
- '<div id="cloud-actions" hidden><button id="cloud-import" type="button">Merge favorites from this device</button><button id="cloud-signout" type="button">Sign out</button></div>'+
- '<p id="cloud-help">A parent connects each device once. Children never need email addresses—just tap their name. This device stays signed in unless you choose Sign out.</p>';
+ '<form id="cloud-email-form" hidden style="display:grid;gap:8px;max-width:420px;margin-top:10px"><label for="cloud-email">Parent email</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><label for="cloud-parent-password">Family account password</label><input id="cloud-parent-password" type="password" autocomplete="current-password" placeholder="Password set by a parent" required minlength="12"><button type="submit" id="cloud-password-login">Sign in with password</button><button type="button" id="cloud-email-link" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Use email link instead</button><p id="cloud-auth-hint" role="status" style="font-size:12px;opacity:.9;margin:0">If you first signed in by email, set a password on the device that is already signed in. No new email is needed then.</p></form>'+
+ '<div id="cloud-actions" hidden><button id="cloud-import" type="button">Merge favorites from this device</button><button id="cloud-set-password" type="button">Set/change parent password</button><button id="cloud-signout" type="button">Sign out</button></div>'+
+ '<form id="cloud-password-setup" hidden style="display:grid;gap:8px;max-width:420px;margin:10px 0"><strong>Set a parent password for other devices</strong><p style="font-size:12px;margin:0;opacity:.9">Do this once on a device where you are already signed in. Future devices can use the parent email and this password without requesting a new sign-in email.</p><label for="cloud-new-password">New password (12+ characters)</label><input id="cloud-new-password" type="password" minlength="12" autocomplete="new-password" required><label for="cloud-confirm-password">Confirm password</label><input id="cloud-confirm-password" type="password" minlength="12" autocomplete="new-password" required><div style="display:flex;gap:8px"><button type="submit">Save password</button><button id="cloud-password-cancel" type="button" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Cancel</button></div><p id="cloud-password-feedback" role="status" style="font-size:12px;margin:0"></p></form>'+ 
+ '<p id="cloud-help">A parent connects each device once with their email and password. Children never need an email or password; they simply select their name. This device stays connected unless signed out.</p>';
  document.querySelector('header')?.append(panel);
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
  const status=(s,error=false)=>{$('cloud-status').textContent=s;$('cloud-status').style.color=error?'#ffb4a8':'#a4dbc5';};
@@ -54,6 +55,11 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  };
  let ui=connected=>{
    $('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;
+   // Forms use CSS grid; explicitly hide when HTML 'hidden' competes with display.
+   $('cloud-email-form').style.display=connected?'none':'grid';
+   $('cloud-password-setup').hidden=!connected || !$('cloud-password-setup').dataset.open;
+   $('cloud-password-setup').style.display=$('cloud-password-setup').hidden?'none':'grid';
+   if(!connected){$('cloud-password-setup').dataset.open='';}
    document.body.classList.toggle('cloud-gated',!connected);
    quickPeople.hidden=!connected;quickPeople.style.display=connected?'flex':'none';parentInfo.hidden=connected;
    if(connected)renderQuickPeople();
@@ -159,11 +165,96 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(channel){await client.removeChannel(channel);channel=null;}
    ui(false);status('Signed out');
  });
+ // Password sign-in does not send email and avoids the project's small email quota.
+ let loginPending=false,emailPending=false;
  $('cloud-email-form').addEventListener('submit',async event=>{
-   event.preventDefault();status('Sending sign-in email…');
+   event.preventDefault();
+   if(loginPending||!client)return;
    const email=$('cloud-email').value.trim();
-   const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-   status(error?'Sign-in email failed: '+error.message:'Check your email for the sign-in link',!!error);
+   const password=$('cloud-parent-password').value;
+   if(password.length<12){status('Enter the parent password (12 or more characters)',true);return;}
+   loginPending=true;$('cloud-password-login').disabled=true;status('Signing in with password…');
+   try{
+     const {error}=await client.auth.signInWithPassword({email,password});
+     $('cloud-parent-password').value='';
+     if(error){
+       status('Password sign-in failed: '+error.message,true);
+       $('cloud-auth-hint').textContent='If you have never set a parent password, use an already signed-in device to set one. The email-link option is only for initial access or recovery.';
+     }else status('Signed in. Loading family profiles…');
+   }catch(error){status('Sign-in connection error: '+error.message,true);}
+   finally{loginPending=false;$('cloud-password-login').disabled=false;}
+ });
+ const emailCooldownKey='pumpkin_signin_email_pause_until';
+ const emailLink=$('cloud-email-link');
+ function checkEmailCooldown(){
+   const until=Number(localStorage.getItem(emailCooldownKey)||0);
+   if(until>Date.now()){
+     emailLink.disabled=true;
+     const mins=Math.ceil((until-Date.now())/60000);
+     $('cloud-auth-hint').textContent='Email link requests are temporarily paused on this browser ('+mins+' min left). Use a password if available. The built-in Supabase email service has a project-wide 2 emails/hour limit.';
+   }else{
+     emailLink.disabled=false;
+     if(until)localStorage.removeItem(emailCooldownKey);
+   }
+ }
+ checkEmailCooldown();
+ emailLink.addEventListener('click',async()=>{
+   if(!client||emailPending)return;
+   checkEmailCooldown();if(emailLink.disabled)return;
+   const input=$('cloud-email');
+   if(!input.reportValidity())return;
+   const email=input.value.trim();
+   // One intentional parent-only email request; prevent accidental account creation.
+   emailPending=true;emailLink.disabled=true;status('Requesting a parent email link…');
+   try{
+     const {error}=await client.auth.signInWithOtp({email,options:{
+       emailRedirectTo:location.origin+location.pathname,
+       shouldCreateUser:false
+     }});
+     if(error){
+       if(error.code==='over_email_send_rate_limit'||/email rate limit exceeded/i.test(error.message)){
+         localStorage.setItem(emailCooldownKey,String(Date.now()+30*60*1000));
+         status('Supabase email limit reached (2 per hour). Use the password method, or try email later.',true);
+       }else if(error.code==='over_request_rate_limit'||error.status===429){
+         localStorage.setItem(emailCooldownKey,String(Date.now()+5*60*1000));
+         status('Too many authentication requests. Use your parent password, or try again later.',true);
+       }else status('Unable to send email link: '+error.message,true);
+     }else{
+       localStorage.setItem(emailCooldownKey,String(Date.now()+90*1000));
+       status('Email link requested. Check the parent inbox and use the most recent link.');
+     }
+   }catch(error){status('Sign-in email connection failed: '+error.message,true);}
+   finally{emailPending=false;checkEmailCooldown();}
+ });
+ // A signed-in parent can attach a password to the existing email-link account.
+ function togglePasswordSetup(open){
+   const form=$('cloud-password-setup');
+   form.dataset.open=open?'yes':'';
+   form.hidden=!open;form.style.display=open?'grid':'none';
+   if(open)$('cloud-new-password').focus();
+   if(!open){form.reset();$('cloud-password-feedback').textContent='';}
+ }
+ $('cloud-set-password').addEventListener('click',()=>togglePasswordSetup(true));
+ $('cloud-password-cancel').addEventListener('click',()=>togglePasswordSetup(false));
+ $('cloud-password-setup').addEventListener('submit',async event=>{
+   event.preventDefault();
+   if(!client||!owner)return;
+   const password=$('cloud-new-password').value,confirmPassword=$('cloud-confirm-password').value;
+   const feedback=$('cloud-password-feedback');
+   if(password.length<12){feedback.textContent='Choose at least 12 characters.';return;}
+   if(password!==confirmPassword){feedback.textContent='Passwords do not match.';return;}
+   if(!window.confirm('Set this password for your existing household account? All family profiles and favorites will stay in the same account.'))return;
+   const save=$('cloud-password-setup').querySelector('button[type="submit"]');
+   save.disabled=true;feedback.textContent='Saving password securely…';
+   try{
+     const {error}=await client.auth.updateUser({password});
+     if(error){feedback.textContent='Could not set password: '+error.message+'. Supabase may require reauthentication on an older session.';}
+     else{
+       togglePasswordSetup(false);
+       status('Parent password saved ✓. New devices can sign in without email links.');
+     }
+   }catch(error){feedback.textContent='Password setup error: '+error.message;}
+   finally{save.disabled=false;}
  });
  // Signed image URLs work only after personal-use thumbnails are uploaded to private Storage.
  const urls=new Map();
