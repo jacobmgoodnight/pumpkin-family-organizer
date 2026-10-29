@@ -55,7 +55,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  let ui=connected=>{
    $('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;
    document.body.classList.toggle('cloud-gated',!connected);
-   quickPeople.hidden=!connected;parentInfo.hidden=connected;
+   quickPeople.hidden=!connected;quickPeople.style.display=connected?'flex':'none';parentInfo.hidden=connected;
    if(connected)renderQuickPeople();
  };
  function enqueue(before,after){
@@ -360,6 +360,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  const oldUi=ui;
  ui=connected=>{
    oldUi(connected);uploadDetails.hidden=!connected;galleryState.hidden=!connected;
+   galleryState.style.display=connected?'flex':'none';
    if(connected){updateGalleryCount();}else{countRequest++;}
  };
  galleryAction.addEventListener('click',()=>{
