@@ -51,7 +51,34 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  }
  window.addEventListener('pumpkin:statechange',()=>renderQuickPeople());
  const offline=clone(bridge.snapshot());
- let client=null,owner=null,channel=null,applying=false,last=null,writes=Promise.resolve(),pending=0,refreshAgain=false,refreshTimer=null,thumbnailTimer=null;
+ let client=null,owner=null,channel=null,applying=false,last=null,refreshAgain=false,refreshTimer=null,thumbnailTimer=null;
+ let outbox=[],flushing=false;
+ const outboxKey=uid=>'pumpkin-family-outbox-v1:'+uid;
+ function saveOutbox(uid){try{localStorage.setItem(outboxKey(uid),JSON.stringify(outbox));}catch(e){status('Changes saved here but offline retry storage is unavailable',true);console.warn('Offline queue storage',e);}}
+ function loadOutbox(uid){
+   try{
+     const data=JSON.parse(localStorage.getItem(outboxKey(uid))||'[]');
+     return Array.isArray(data)?data.filter(x=>x&&['person','choice','remove-person'].includes(x.kind)&&x.row&&typeof x.row==='object').slice(0,2500):[];
+   }catch{return[];}
+ }
+ async function flushOutbox(){
+   if(flushing||!owner||!client||!outbox.length)return;
+   const uid=owner;flushing=true;status('Syncing family changes…');
+   try{
+     while(owner===uid&&outbox.length){
+       const op=outbox[0];let result;
+       if(op.kind==='person')result=await client.from('pc_people').upsert({user_id:uid,...op.row},{onConflict:'user_id,person_id'});
+       else if(op.kind==='choice')result=await client.from('pc_choices').upsert({user_id:uid,...op.row},{onConflict:'user_id,person_id,template_id'});
+       else result=await client.from('pc_people').delete().eq('user_id',uid).eq('person_id',op.row.person_id);
+       if(result.error)throw result.error;
+       if(owner!==uid)return;
+       outbox.shift();saveOutbox(uid);
+     }
+     if(owner===uid){status('Synced ✓');if(refreshAgain){refreshAgain=false;requestRefresh();}}
+   }catch(e){if(owner===uid)status('Changes saved on this device — sync retry needed',true);console.error('Pumpkin sync retry',e);}
+   finally{flushing=false;}
+ }
+
  const peopleMap=s=>new Map((s.people||[]).map(p=>[p.id,p.name]));
  const choiceMap=s=>{
    const m=new Map();
@@ -76,34 +103,22 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  };
  function enqueue(before,after){
    if(!owner||!client||applying)return;
-   const a=peopleMap(before),b=peopleMap(after),ca=choiceMap(before),cb=choiceMap(after);
-   const changed=[...new Set([...ca.keys(),...cb.keys()])].filter(k=>JSON.stringify(ca.get(k)||null)!==JSON.stringify(cb.get(k)||null));
-   const up=[...b].filter(([id,name])=>a.get(id)!==name);
-   const gone=[...a.keys()].filter(id=>!b.has(id));
-   if(!changed.length&&!up.length&&!gone.length)return;
-   const job=async()=>{
-     pending++;
-     try{
-       if(up.length){
-         const {error}=await client.from('pc_people').upsert(up.map(([person_id,display_name])=>({user_id:owner,person_id,display_name})),{onConflict:'user_id,person_id'});
-         if(error)throw error;
-       }
-       for(const k of changed){
-         const [person_id,template_id]=JSON.parse(k);
-         if(gone.includes(person_id))continue;
-         const row=cb.get(k)||{person_id,template_id,favorite:false,final_pick:false};
-         const {error}=await client.from('pc_choices').upsert({user_id:owner,...row},{onConflict:'user_id,person_id,template_id'});
-         if(error)throw error;
-       }
-       for(const person_id of gone){
-         const {error}=await client.from('pc_people').delete().eq('user_id',owner).eq('person_id',person_id);
-         if(error)throw error;
-       }
-       status('Synced ✓');
-     }catch(e){status('Sync error — check connection',true);console.error('Pumpkin sync',e);}
-     finally{pending--;if(refreshAgain&&pending===0)requestRefresh();}
-   };
-   writes=writes.then(job,job);
+   const uid=owner,a=peopleMap(before),b=peopleMap(after),ca=choiceMap(before),cb=choiceMap(after),ops=[];
+   for(const [person_id,display_name] of b)if(a.get(person_id)!==display_name)
+     ops.push({kind:'person',row:{person_id,display_name}});
+   const changed=[...new Set([...ca.keys(),...cb.keys()])]
+     .filter(k=>JSON.stringify(ca.get(k)||null)!==JSON.stringify(cb.get(k)||null));
+   const removed=[...a.keys()].filter(id=>!b.has(id));
+   for(const key of changed){
+     const [person_id,template_id]=JSON.parse(key);
+     if(removed.includes(person_id))continue;
+     ops.push({kind:'choice',row:cb.get(key)||{person_id,template_id,favorite:false,final_pick:false}});
+   }
+   for(const person_id of removed)ops.push({kind:'remove-person',row:{person_id}});
+   if(!ops.length)return;
+   outbox.push(...ops);saveOutbox(uid);
+   status(navigator.onLine?'Syncing family changes…':'Offline — changes saved on this device',!navigator.onLine);
+   void flushOutbox();
  }
  window.addEventListener('pumpkin:statechange',()=>{
    if(!owner||applying)return;
@@ -123,13 +138,15 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  };
  async function refresh(){
    if(!owner)return;
-   if(pending){refreshAgain=true;return;}
+   const uid=owner;
+   if(flushing||outbox.length){refreshAgain=true;void flushOutbox();return;}
    refreshAgain=false;
    const [p,c]=await Promise.all([
      client.from('pc_people').select('person_id,display_name').eq('user_id',owner),
      client.from('pc_choices').select('person_id,template_id,favorite,final_pick').eq('user_id',owner)
    ]);
    if(p.error||c.error){status('Unable to load cloud choices',true);console.error(p.error||c.error);return;}
+   if(owner!==uid||flushing||outbox.length){refreshAgain=true;return;}
    applying=true;
    try{bridge.applyRemote(combine(p.data||[],c.data||[]));last=clone(bridge.snapshot());}
    finally{applying=false;}
@@ -137,7 +154,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  }
  function requestRefresh(){
    clearTimeout(refreshTimer);
-   refreshTimer=setTimeout(()=>{if(pending)refreshAgain=true;else refresh();},220);
+   refreshTimer=setTimeout(()=>{if(flushing||outbox.length){refreshAgain=true;void flushOutbox();}else void refresh();},220);
  }
  async function seed(){
    const {error:e}=await client.from('pc_accounts').upsert({user_id:owner},{onConflict:'user_id'});
@@ -171,7 +188,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  }
  $('cloud-import').addEventListener('click',merge);
  $('cloud-signout').addEventListener('click',async()=>{
-   await client.auth.signOut();owner=null;
+   await client.auth.signOut();owner=null;outbox=[];
    if(channel){await client.removeChannel(channel);channel=null;}
    ui(false);status('Signed out');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));
  });
@@ -297,27 +314,27 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
      async function onSession(session){
-       if(!session?.user){owner=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
+       if(!session?.user){owner=null;outbox=[];urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
        urls.clear();urlsUntil=0;
-       owner=session.user.id;status('Loading family choices…');
+       owner=session.user.id;outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
        try{
-         await seed();await refresh();ui(true);
+         await seed();if(outbox.length)await flushOutbox();await refresh();ui(true);
          if(!previewObserver){previewObserver=new MutationObserver(schedulePreviews);previewObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});}
          if(channel)await client.removeChannel(channel);
          channel=client.channel('pc-changes-'+owner)
            .on('postgres_changes',{event:'*',schema:'public',table:'pc_choices',filter:'user_id=eq.'+owner},requestRefresh)
            .on('postgres_changes',{event:'*',schema:'public',table:'pc_people',filter:'user_id=eq.'+owner},requestRefresh)
            .subscribe();
-         status('Synced ✓');
+         status(outbox.length?'Changes saved locally — reconnect to sync':'Synced ✓',!!outbox.length);
          window.dispatchEvent(new Event('pumpkin:cloudready'));
        }catch(e){status('Cloud setup incomplete: '+e.message,true);console.error(e);ui(false);}
      }
      const {data,error}=await client.auth.getSession();if(error)throw error;
      client.auth.onAuthStateChange((_event,session)=>setTimeout(()=>onSession(session),0));
      await onSession(data?.session);
-     addEventListener('online',()=>{if(owner)refresh()});
-     addEventListener('focus',()=>{if(owner){refresh();schedulePreviews();}});
+     addEventListener('online',()=>{if(owner){void flushOutbox().then(()=>requestRefresh());}});
+     addEventListener('focus',()=>{if(owner){void flushOutbox().then(()=>requestRefresh());schedulePreviews();}});
      setInterval(()=>{if(owner)schedulePreviews()},20*60*1000);
    }catch(e){status('Cloud unavailable: '+e.message,true);console.error(e);ui(false);}
  }
