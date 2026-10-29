@@ -37,6 +37,8 @@ actions.append(importBtn,webBtn,libraryTools);
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
  const openImport=src=>{if(!owner()){alert("Connect a parent account first.");return;}form.reset();category.value="Family imports";webSource=src||null;if(src){title.value=src.title||"";link.value=src.sourceUrl||src.source_url||"";tags.value="pumpkin, carving";}formStatus.textContent=src?"Download an authorized printable file from the source website, then choose that file here.":"Choose your printable PDF/image and optional preview.";dialog.showModal();title.focus()};
  let providerConfigured=null,providerChecking=false;
+ const recentSearches=new Map();
+ let currentWebRequest=0,activeTerm="",panelMode="search";
  async function checkSearchConnection(){
    if(!owner()||!client()||providerChecking)return;
    providerChecking=true;
@@ -57,7 +59,20 @@ actions.append(importBtn,webBtn,libraryTools);
    finally{providerChecking=false;}
  }
  const webUrl=()=>{google.href="https://www.google.com/search?tbm=isch&q="+encodeURIComponent(webInput.value.trim()+" pumpkin carving stencil printable")};
- const openWeb=q=>{panel.hidden=false;webInput.value=q||$("search")?.value||"";webUrl();void checkSearchConnection();panel.scrollIntoView({behavior:"smooth",block:"nearest"})};
+ const openWeb=q=>{
+   panelMode="search";panel.hidden=false;
+   webInput.value=q||$("search")?.value||"";
+   const requested=webInput.value.trim();
+   webUrl();panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+   // Discovery is explicitly requested, so search now rather than making the
+   // family click Search Google Images a second time.
+   void (async()=>{
+     await checkSearchConnection();
+     if(panelMode!=="search"||webInput.value.trim()!==requested)return;
+     if(requested.length>=2)void findWeb({reuse:true});
+     else{grid.replaceChildren();feedback.textContent="Enter a subject above, then select Search Google Images.";}
+   })();
+ };
  importBtn.addEventListener("click",()=>openImport(null));
  webBtn.addEventListener("click",()=>openWeb());
  ideasBtn.addEventListener("click",showIdeas);
@@ -81,33 +96,64 @@ actions.append(importBtn,webBtn,libraryTools);
    },{onConflict:"user_id,source_url"});
    b.disabled=false;b.textContent=error?"Save failed":"♥ Saved idea";if(!error)await fetchIdeas();
  }
- async function findWeb(){
-   const term=webInput.value.trim();if(term.length<2){feedback.textContent="Enter at least 2 characters.";return;}
-   webUrl();grid.replaceChildren();
-   if(!owner()){feedback.textContent="Connect a parent account to search within the page, or open Google Images.";return;}
-   if(providerConfigured===false){feedback.textContent="Set SERPAPI_KEY in Supabase Edge Functions → Secrets, then refresh this app. The Open Google Images link works without a key.";return;}
-   findBtn.disabled=true;feedback.textContent="Searching Google Images…";
+ function renderWebCards(results,term,reused=false){
+   grid.replaceChildren();
+   feedback.textContent=results.length
+     ?results.length+" results"+(reused?" · Reused recent results":"")+" · Open original sources before saving or importing."
+     :"No results found. Try the external Google Images link.";
+   for(const r of results){
+     if(!safeUrl(r.thumbnail)||!safeUrl(r.sourceUrl))continue;
+     const nav=card({name:r.title,image:r.thumbnail,source:r.source,url:r.sourceUrl});
+     const save=make("button","","♡ Save idea"),imp=make("button","","Import file…");
+     save.addEventListener("click",()=>saveIdea(r,term,save));
+     imp.addEventListener("click",()=>openImport(r));
+     nav.append(save,imp);
+   }
+ }
+ async function findWeb({reuse=false}={}){
+   panelMode="search";
+   const term=webInput.value.trim();
+   if(term.length<2){feedback.textContent="Enter at least 2 characters.";return;}
+   webUrl();
+   const uid=owner(),key=term.toLowerCase().replace(/\\s+/g," ");
+   if(!uid){grid.replaceChildren();feedback.textContent="Connect a parent account to search within the page, or open Google Images.";return;}
+   if(reuse){
+     const entry=recentSearches.get(key);
+     if(entry&&Date.now()-entry.time<15*60*1000){
+       ++currentWebRequest;activeTerm="";findBtn.disabled=false;
+       renderWebCards(entry.results,term,true);return;
+     }
+   }
+   if(activeTerm===key)return; // avoid duplicate concurrent API requests
+   if(providerConfigured===false){grid.replaceChildren();feedback.textContent="Set SERPAPI_KEY in Supabase Edge Functions → Secrets, then refresh this app. The Open Google Images link works without a key.";return;}
+   const request=++currentWebRequest;
+   activeTerm=key;findBtn.disabled=true;grid.replaceChildren();feedback.textContent="Searching Google Images…";
    try{
      const {data,error}=await client().functions.invoke("pumpkin-image-search",{body:{query:term}});
      if(error){const serverError=await error.context?.json?.().catch(()=>null);throw Error(serverError?.error||error.message)}
      if(data?.error)throw Error(data.error);
+     if(request!==currentWebRequest||owner()!==uid||panelMode!=="search")return;
      const results=Array.isArray(data?.results)?data.results:[];
-     feedback.textContent=results.length?results.length+" results · Open original sources before saving or importing.":"No results found. Try the external Google Images link.";
-     for(const r of results){if(!safeUrl(r.thumbnail)||!safeUrl(r.sourceUrl))continue;
-       const nav=card({name:r.title,image:r.thumbnail,source:r.source,url:r.sourceUrl});
-       const save=make("button","","♡ Save idea"),imp=make("button","","Import file…");
-       save.addEventListener("click",()=>saveIdea(r,term,save));imp.addEventListener("click",()=>openImport(r));nav.append(save,imp);
-     }
-   }catch(e){feedback.textContent=e.message+". The Google Images API key may not be configured yet. The external Google Images link still works."}
-   finally{findBtn.disabled=false}
+     recentSearches.set(key,{time:Date.now(),results});
+     if(recentSearches.size>12)recentSearches.delete(recentSearches.keys().next().value);
+     renderWebCards(results,term);
+   }catch(e){
+     if(request===currentWebRequest&&owner()===uid&&panelMode==="search")
+       feedback.textContent=e.message+". The external Google Images link still works.";
+   }finally{
+     if(request===currentWebRequest){activeTerm="";findBtn.disabled=false;}
+   }
  }
- findBtn.addEventListener("click",findWeb);webInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();findWeb()}});
+ findBtn.addEventListener("click",()=>void findWeb());
+ webInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();void findWeb()}});
  async function fetchIdeas(){
    if(!owner())return;const {data,error}=await client().from("pc_web_ideas").select("*").eq("user_id",owner()).order("created_at",{ascending:false}).limit(300);
    if(!error){ideas=data||[];ideasBtn.textContent="♡ Saved ideas ("+ideas.length+")";}
  }
  function showIdeas(){
-   if(!owner()){alert("Connect a parent account first.");return;}panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
+   if(!owner()){alert("Connect a parent account first.");return;}
+   panelMode="ideas";++currentWebRequest;activeTerm="";findBtn.disabled=false;
+   panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=ideas.length?ideas.length+" saved source links. No files were copied.":"No saved ideas yet. Search the web to save some.";
    for(const idea of ideas){const nav=card({name:idea.title,image:idea.preview_url,source:idea.source_name,url:idea.source_url});
      const imp=make("button","","Import file…"),remove=make("button","","Remove");
@@ -119,6 +165,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  function showImports(){
    if(!owner()){alert("Connect the parent account first.");return;}
+   panelMode="imports";++currentWebRequest;activeTerm="";findBtn.disabled=false;
    panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=cloudRows.length?cloudRows.length+" imported family templates. Rename or remove a pattern here. Removing also clears its saved favorites and final selections.":"No imports yet. Choose Import pattern to add a PDF or printable image.";
    for(const row of cloudRows){
@@ -207,7 +254,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  async function connect(){
    const uid=owner();if(!uid)return;
-   if(userId!==uid){userId=uid;cache.clear();cacheUntil=0;ideas=[];cloudRows=[];if(channel)client()?.removeChannel(channel);
+   if(userId!==uid){userId=uid;recentSearches.clear();++currentWebRequest;activeTerm="";cache.clear();cacheUntil=0;ideas=[];cloudRows=[];if(channel)client()?.removeChannel(channel);
      channel=client().channel("pc-library-"+uid)
        .on("postgres_changes",{event:"*",schema:"public",table:"pc_imports",filter:"user_id=eq."+uid},refreshImports)
        .on("postgres_changes",{event:"*",schema:"public",table:"pc_web_ideas",filter:"user_id=eq."+uid},fetchIdeas).subscribe();
@@ -218,6 +265,6 @@ actions.append(importBtn,webBtn,libraryTools);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
  window.addEventListener("pumpkin:cloudready",connect);
  setInterval(()=>{if(owner())refreshImports()},25*60*1000);
- window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;cache.clear();cacheUntil=0;cloudRows=[];bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
+ window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;recentSearches.clear();++currentWebRequest;activeTerm="";cache.clear();cacheUntil=0;cloudRows=[];bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
  if(owner())connect();
 }
