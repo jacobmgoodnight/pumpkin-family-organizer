@@ -51,7 +51,7 @@ actions.append(importBtn,webBtn,libraryTools);
  const quickImport=make("div","wide");quickImport.hidden=true;
  quickImport.style.cssText="border:1px solid #668369;border-radius:10px;padding:10px;background:#17271c";
  const quickPreview=make("img");quickPreview.hidden=true;
- quickPreview.style.cssText="display:block;width:100%;height:auto;max-height:150px;object-fit:contain;border-radius:6px;background:#0d1911";
+ quickPreview.style.cssText="width:100%;height:auto;max-height:150px;object-fit:contain;border-radius:6px;background:#0d1911";
  const quickStatus=make("p","pf-note");quickStatus.setAttribute("aria-live","polite");
  const quickLinks=make("div");quickLinks.style.cssText="display:flex;flex-wrap:wrap;gap:8px;align-items:center";
  const retryImage=make("button","","Try automatic image import"),openImage=make("a","","Open original image ↗"),openSource=make("a","","Visit pattern source ↗");
@@ -60,7 +60,7 @@ actions.append(importBtn,webBtn,libraryTools);
  quickLinks.append(retryImage,openImage,openSource);quickImport.append(quickPreview,quickStatus,quickLinks);
  form.append(quickImport);
  const rights=make("label","wide"),check=document.createElement("input");check.type="checkbox";check.required=true;check.style.width="18px";
- rights.style.cssText="display:flex;gap:8px;flex-direction:row;align-items:start";rights.append(check,document.createTextNode("I have permission to store these selected files privately for our family. Web search previews are not automatically downloaded."));form.append(rights);
+ rights.style.cssText="display:flex;gap:8px;flex-direction:row;align-items:start";rights.append(check,document.createTextNode("I have permission to upload these selected or retrieved files privately for our family. No file is uploaded until I confirm."));form.append(rights);
  const submit=make("button","wide","Upload and add pattern");submit.type="submit";const formStatus=make("p","pf-note wide");formStatus.setAttribute("aria-live","polite");form.append(submit,formStatus);dialog.append(form);document.body.append(dialog);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
@@ -95,6 +95,7 @@ actions.append(importBtn,webBtn,libraryTools);
        const file=await fetchAuthorizedImage(original);
        if(attempt!==importAttempt||!dialog.open)return;
        stagedOriginal=file;
+       printable.required=false; // the staged file satisfies the original-file requirement
        let quality="";
        if(typeof createImageBitmap==="function"){
          try{
@@ -121,7 +122,7 @@ actions.append(importBtn,webBtn,libraryTools);
    }
    if(attempt===importAttempt)retryImage.disabled=false;
  }
- retryImage.addEventListener("click",()=>{stagedOriginal=null;stagedPreview=null;void tryImageImport()});
+ retryImage.addEventListener("click",()=>{stagedOriginal=null;stagedPreview=null;printable.required=true;void tryImageImport()});
  printable.addEventListener("change",()=>{
    if(printable.files[0]&&quickImport.hidden===false)
      quickStatus.textContent="Selected "+printable.files[0].name+". This file will be used as the printable original. The optional preview can be left blank for JPG/PNG/WebP.";
@@ -130,15 +131,16 @@ actions.append(importBtn,webBtn,libraryTools);
  const openImport=src=>{
    if(!owner()){alert("Connect a parent account first.");return;}
    importAttempt++;stagedOriginal=null;stagedPreview=null;imageOriginalUrl="";imagePreviewUrl="";
-   form.reset();category.value="Family imports";webSource=src||null;quickImport.hidden=!src;
+   form.reset();printable.required=true;category.value="Family imports";webSource=src||null;quickImport.hidden=!src;
    if(src){
      title.value=src.title||"";
      link.value=src.sourceUrl||src.source_url||"";
      tags.value="pumpkin, carving";
      imageOriginalUrl=safeUrl(src.originalImageUrl||src.original_image_url);
      imagePreviewUrl=safeUrl(src.thumbnail||src.preview_url);
-     quickPreview.src=imagePreviewUrl||imageOriginalUrl||"";
-     quickPreview.hidden=!quickPreview.src;
+     const imageForPreview=imagePreviewUrl||imageOriginalUrl;
+     if(imageForPreview){quickPreview.src=imageForPreview;quickPreview.hidden=false;}
+     else{quickPreview.removeAttribute("src");quickPreview.hidden=true;}
      openImage.href=imageOriginalUrl||imagePreviewUrl||link.value||"#";
      openImage.hidden=!(imageOriginalUrl||imagePreviewUrl);
      openSource.href=link.value||"#";openSource.hidden=!safeUrl(link.value);
