@@ -16,6 +16,14 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  document.querySelector('header')?.append(panel);
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
  const status=(s,error=false)=>{$('cloud-status').textContent=s;$('cloud-status').style.color=error?'#ffb4a8':'#a4dbc5';};
+ const accountSettings=document.createElement('details');
+ accountSettings.id='cloud-account-settings';accountSettings.hidden=true;
+ accountSettings.style.cssText='margin-top:7px;border-top:1px solid #53665c;padding:9px 0';
+ const accountSummary=document.createElement('summary');
+ accountSummary.textContent='⚙ Family account settings';accountSummary.style.cssText='cursor:pointer;color:#eabb86;font-size:13px';
+ accountSettings.append(accountSummary);
+ const authActions=$('cloud-actions'),passwordSetup=$('cloud-password-setup');
+ accountSettings.append(authActions,passwordSetup);panel.append(accountSettings);
  const parentInfo=document.createElement('div');
  parentInfo.id='cloud-child-setup';
  parentInfo.style.cssText='font-size:13px;line-height:1.5;padding:8px 0;color:#e4ded3';
@@ -61,7 +69,9 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    $('cloud-password-setup').style.display=$('cloud-password-setup').hidden?'none':'grid';
    if(!connected){$('cloud-password-setup').dataset.open='';}
    document.body.classList.toggle('cloud-gated',!connected);
-   quickPeople.hidden=!connected;quickPeople.style.display=connected?'flex':'none';parentInfo.hidden=connected;
+   quickPeople.hidden=true;quickPeople.style.display='none';parentInfo.hidden=connected;
+   $('cloud-help').hidden=connected;
+   $('cloud-account-settings').hidden=!connected;
    if(connected)renderQuickPeople();
  };
  function enqueue(before,after){
@@ -163,7 +173,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  $('cloud-signout').addEventListener('click',async()=>{
    await client.auth.signOut();owner=null;
    if(channel){await client.removeChannel(channel);channel=null;}
-   ui(false);status('Signed out');
+   ui(false);status('Signed out');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));
  });
  // Password sign-in does not send email and avoids the project's small email quota.
  let loginPending=false,emailPending=false;
@@ -283,7 +293,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
      async function onSession(session){
-       if(!session?.user){owner=null;ui(false);status('Sign in to share favorites');return;}
+       if(!session?.user){owner=null;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
        owner=session.user.id;status('Loading family choices…');
        try{
@@ -295,6 +305,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
            .on('postgres_changes',{event:'*',schema:'public',table:'pc_people',filter:'user_id=eq.'+owner},requestRefresh)
            .subscribe();
          status('Synced ✓');
+         window.dispatchEvent(new Event('pumpkin:cloudready'));
        }catch(e){status('Cloud setup incomplete: '+e.message,true);console.error(e);ui(false);}
      }
      const {data,error}=await client.auth.getSession();if(error)throw error;
@@ -503,4 +514,5 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(!failed)uploadDetails.open=false;
  });
  start();
+ import('./family-features.js').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
 }
