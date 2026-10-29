@@ -26,6 +26,10 @@ RLS is active on the public app tables. Policies scope reads/writes to `auth.uid
 - The Edge Function `pumpkin-image-search` uses **manual user/family authorization** and the `SERPAPI_KEY` server-only environment secret.
 - `pc_choices`, `pc_people`, `pc_imports` and `pc_web_ideas` have been included in Supabase Realtime publication.
 
+## Read-only repeatable audit
+
+Run the repository's [schema-audit.sql](schema-audit.sql) in the Supabase SQL Editor to recheck the exact table columns, constraints, indexes, RLS policies, bucket privacy, and Realtime publications. This is a **read-only** audit and can be repeated without touching family data.
+
 ## Reproducing the schema safely
 
 Use a **separate test Supabase project** and first extract a real schema-only dump from the project using a supported Supabase CLI version; verify the dump includes table definitions, indexes, constraints, RLS policies and storage policies before replaying it against test. Supabase-managed `auth` and `storage` schemas require special care.
