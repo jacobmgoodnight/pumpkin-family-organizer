@@ -1,39 +1,56 @@
 # Goodnight Family Pumpkin Organizer 🎃
 
-Family pumpkin-stencil discovery with profiles for Jacob, Shelby, Charlotte and Violet.
+[Open the family website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/)
 
-**Website (after GitHub Pages is enabled):** https://jacobmgoodnight.github.io/pumpkin-family-organizer/
+A shared family pumpkin-carving catalog with **2,053 designs** and **1,553 visual descriptions**.
 
-## What's included
+## Features
 
-- Searchable catalog of **2,053 carving designs** and **1,553 visual descriptions**
-- Personal favorites, comparisons and final carving picks
-- Separate Supabase cloud database for household selections, with realtime changes
-- Private storage bucket for approved thumbnail assets (none are included in this public repository)
-- Optional Google Images link when the local collection has few matches
+- Profiles for Jacob, Shelby, Charlotte, Violet and optional Family
+- Live family favorites and final picks, with account-scoped Supabase synchronization
+- Smart search, galleries, compare, and Google Images fallback
+- Private, opt-in thumbnail uploads under **Family sync → Add private thumbnail folders**
+- Original-file locator for patterns stored on your own Mac/PC
+- Original licensed PDFs are **not** published by this repository
 
-## Turn on the website
+## Family setup
 
-1. Open [Repository Settings → Pages](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages).
-2. Under **Build and deployment**, select **Deploy from a branch**.
-3. Set branch **main** and folder **/(root)** and click **Save**.
-4. In [Supabase → Authentication → URL Configuration](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration), set **Site URL** to `https://jacobmgoodnight.github.io/pumpkin-family-organizer/` and add that exact URL under **Redirect URLs**.
-5. Open the Pages URL; request an email sign-in link using your household email, then select a family profile. Use the same trusted household account from other devices.
+1. Use the same **trusted household adult email** on each device to sign in with an email link. There are no separate child login accounts.
+2. After sign-in shows **Synced ✓**, select a family profile and favorite a design. Check the same profile on another device.
+3. To populate images, on a Mac/PC open **Add private thumbnail folders** (Family sync panel), affirm that you have permission to store the selected previews, and upload **Thumbnails**, then **Additional_Thumbnails**, separately.
+4. The private Supabase Storage bucket `pc-previews` is account scoped and not public. The image files never enter this public repository.
+5. On the website, **Find original** shows the real source collection and a copyable file path. The first time, click **Set my local library folder** and point it to the directory containing both `Zombie Pumpkins` and `____Pumpkin_Complete_Family_Organizer_HD`.
 
-## Artwork and printing
+**Important:** Web browsers cannot directly open `file://` paths to another computer's drive. The online site currently locates originals only; it does not host PDFs or enable remote PDF printing.
 
-**No copyrighted pattern PDFs or thumbnails are published in this repository.** Only the catalog and user-interface code are public. The website may show missing thumbnails until properly permitted private preview images are uploaded to Supabase Storage. Printable originals remain in your local `K:` organizer until their paths and hosting permissions are reviewed.
+## Local PDF link repair
 
-Favorites are protected by account-scoped row-level security in Supabase; the website's catalog entries and public frontend code are visible to anyone. The current login method is a shared trusted adult email account, not independent child authentication.
+In the local `START_HERE.html`, original Zombie Pumpkins PDFs are under `../Zombie Pumpkins/<original publisher collection>/<filename>.pdf` relative to the organizer folder. The category paths formerly used for PDF links were virtual organizer groupings, not the actual source folders.
 
-## State
+The standalone `Pumpkin_PDF_Original_Links_Upgrade.zip` installer is provided separately in ChatGPT. It fixes the local HTML without copying PDFs. It also includes `Audit_Original_Files.py` to check all 2,053 file paths on your actual drive and report mismatches. The catalog retains Dolly Parton locally.
 
-- [x] Source website published to GitHub repository
-- [x] Separate Supabase project and secure tables created
-- [x] Public publishable project key configured (no secret keys)
-- [ ] GitHub Pages enabled in repository settings
-- [ ] Auth Site URL and allowed Redirect URL configured in Supabase
-- [ ] First household sign-in and two-device synchronization tested
-- [ ] Permission-appropriate previews uploaded and PDF mapping repaired
+## Technical/security notes
 
-The existing offline organizer remains unchanged. Export a JSON backup before importing selections from a previous browser.
+- Static site: GitHub Pages (source public)
+- Sync: Supabase Auth, Postgres with RLS, and Realtime
+- Private preview bucket: Supabase Storage; users can upload/read in their own account folder only
+- Browser configuration uses a **publishable key**, never a service-role/secret key
+- Favorites in a local browser stay separate until you sign in; see **Merge favorites from this device** when needed
+- The complete library of images and PDF files remains on your computer until you explicitly choose to store authorized previews privately. Verify your pattern licenses before uploading previews.
+- The web experience is not guaranteed to work offline.
+
+## Deployment settings
+
+- [GitHub Pages settings](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages): deploy **main / root**
+- [Supabase Auth URL settings](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration): Site URL and Redirect URL `https://jacobmgoodnight.github.io/pumpkin-family-organizer/`
+
+## Deployment status
+
+- [x] GitHub repository and Supabase database configured
+- [x] Account-upsert RLS policy added to resolve first sign-in error
+- [x] Private authenticated image-upload policies
+- [x] Web print locator and explicit user-initiated thumbnail uploader
+- [ ] Re-test first family sign-in on a real device
+- [ ] Test two-device real-time favorites
+- [ ] Upload permission-appropriate private previews from the user's Mac/PC
+- [ ] Confirm original-file audit and printing from the locally fixed organizer
