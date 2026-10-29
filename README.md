@@ -46,9 +46,19 @@ An additional, lightweight **offline suggestion list** appears after typing **2 
 
 ## Google Images inside the app
 
+### Collapsible discovery panel
+
+The **Find more printable designs** panel now has **− Minimize / + Expand** and **✕ Close** controls. Minimize keeps the searched image cards ready to reopen without navigating away. Close hides the panel entirely; recent online results can still be reused from the 15-minute in-session cache when reopened.
+
 Selecting **Find more online** now opens the inline discovery panel **and automatically searches Google Images** using the current subject. No second click is necessary. The **Search Google Images** button remains for running a new or refreshed query after editing the online-search input. Typing in the built-in library search remains local and uses no SerpApi credits: a provider search is triggered only by explicitly selecting **Find more online** or **Search Google Images**. If the library has five or fewer matching patterns, a contextual "more designs" shortcut appears. Reopening the same query within 15 minutes reuses session-cached results without another provider request.
 
-Once enabled, the in-app results include an externally hosted thumbnail, title, source website, **Open source**, **Save idea**, and **Import file**. The cards are visually integrated with the Halloween interface but remain **separate from the licensed pattern gallery** until the family uploads an authorized printable file. **Save idea** stores a source reference, not a permanent printable PDF. Remote thumbnails and third-party sites may disappear, block embedding, or be subject to copyrights. The app does not automatically download or republish them.
+Once enabled, the in-app results include an externally hosted thumbnail, title, source website, **Open source**, **Save idea**, and **Import image**. The cards are visually integrated with the Halloween interface but remain **separate from the licensed pattern gallery** until the family uploads an authorized printable file. **Save idea** stores a source reference, not a permanent printable PDF. Remote thumbnails and third-party sites may disappear, block embedding, or be subject to copyrights. The app does not automatically download or republish them.
+
+### Easier image importing from search results
+
+Selecting **Import image…** on a Google Images result now pre-fills the design name, source and tags, displays the image preview and **tries to retrieve the original image directly in the browser**. When a website permits cross-origin image downloads, the printable image is staged automatically; after confirming permission, select **Upload and add pattern** to save it to the private family library. An imported JPG, PNG or WebP automatically doubles as the gallery preview if no extra preview is selected. The app warns when the original image may be too small for a clear print.
+
+This is a **best-effort, browser-only process**. Some image hosts block cross-origin downloads; when that happens, select **Open original image** or **Visit pattern source**, save a permitted high-resolution image or PDF manually and select it in the same dialog. When available, a small web preview may be fetched for the gallery but is **never substituted as the printable original**. Google Images results usually do not provide a PDF download URL and the app does **not** scrape PDFs, bypass site restrictions or copy copyrighted designs automatically. Uploads require a signed-in parent and an explicit rights confirmation.
 
 ### Free SerpApi setup (recommended)
 
@@ -84,7 +94,7 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 - **Storage:** Both `pc-previews` and `pc-family-imports` are **private** and use account-scoped object paths; signed URLs have time limits.
 - **Image discovery:** Deployed `pumpkin-image-search` Edge Function calls SerpApi server-side, with a server-held `SERPAPI_KEY`. It uses gateway `verify_jwt: false` with **manual user token and family-account verification inside the function**; do not remove those internal checks.
 - **Credentials:** The frontend holds a publishable Supabase key, **never a service-role key or SerpApi key**. Passwords are handled by Supabase Auth.
-- **Limitations:** External thumbnails still load from their source hosts; arbitrary websites may block them. Do not automatically mirror third-party copyrighted images. No offline caching of licensed previews or signed URLs is implemented.
+- **Limitations:** External thumbnails still load from their source hosts; arbitrary websites may block them. Optional original-image retrieval uses the signed-in browser and CORS rather than server-side unrestricted URL fetching; imported images are only uploaded after explicit rights confirmation. No offline caching of licensed previews or signed URLs is implemented.
 
 ## Deploy and verify
 
@@ -95,4 +105,4 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 
 **Engineering checks completed:** Repository bridge and feature wiring reviewed; private buckets and their uploaded preview counts checked; schema RLS and realtime publication reviewed; JavaScript syntax checked. There is still one Supabase Auth advisory about disabled leaked-password protection (which may depend on plan). [Supabase security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 
-**Still to acceptance-test:** A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, and expansion of 48-image responses with a live SerpApi search. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.
+**Still to acceptance-test:** A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, expansion of 48-image responses with a live SerpApi search, and the new best-effort browser auto-fetch/import flow against real image hosts. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.

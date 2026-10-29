@@ -12,14 +12,27 @@ actions.append(importBtn,webBtn,libraryTools);
  (document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
  // Search all collections by default; curated Zombie Pumpkins still wins close relevance ties.
  const initialSource=$("source");if(initialSource&&initialSource.value==="zombie"){initialSource.value="";initialSource.dispatchEvent(new Event("change",{bubbles:true}));}
- const panel=make("section","pf-panel");panel.hidden=true;panel.append(make("h3","","Find more printable designs"));
- panel.append(make("p","pf-note","External results are suggestions, not part of your library. Check the original source and usage rights before importing."));
+ const panel=make("section","pf-panel");panel.hidden=true;
+ const panelHeader=make("div","pf-panel-header"),panelTitle=make("h3","","Find more printable designs"),panelControls=make("div"),panelBody=make("div","pf-panel-body");
+ const minimizeBtn=make("button","","− Minimize"),closePanelBtn=make("button","","✕ Close");
+ panelHeader.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap";
+ panelTitle.style.margin="0";panelControls.style.cssText="display:flex;gap:6px;align-items:center";
+ minimizeBtn.type="button";closePanelBtn.type="button";minimizeBtn.setAttribute("aria-expanded","true");
+ panelControls.append(minimizeBtn,closePanelBtn);panelHeader.append(panelTitle,panelControls);panel.append(panelHeader,panelBody);
+ panelBody.append(make("p","pf-note","External results are suggestions, not part of your library. Check the original source and usage rights before importing."));
+ function expandPanel(){panel.hidden=false;panelBody.hidden=false;minimizeBtn.textContent="− Minimize";minimizeBtn.setAttribute("aria-expanded","true");}
+ minimizeBtn.addEventListener("click",()=>{
+   panelBody.hidden=!panelBody.hidden;
+   minimizeBtn.textContent=panelBody.hidden?"+ Expand":"− Minimize";
+   minimizeBtn.setAttribute("aria-expanded",String(!panelBody.hidden));
+ });
+ closePanelBtn.addEventListener("click",()=>{panel.hidden=true;});
  const searchLine=make("div","pf-search"),webInput=document.createElement("input"),findBtn=make("button","pf-primary","Search Google Images"),google=make("a","","Open Google Images ↗");
  webInput.type="search";webInput.placeholder="e.g. Hello Kitty";webInput.setAttribute("aria-label","Search web patterns");
- google.target="_blank";google.rel="noopener noreferrer";searchLine.append(webInput,findBtn,google);panel.append(searchLine);
- const providerNotice=make("p","pf-note");providerNotice.hidden=true;panel.append(providerNotice);
- const feedback=make("p","pf-note");feedback.setAttribute("aria-live","polite");const grid=make("div","pf-grid");panel.append(feedback,grid);
- const moreImages=make("button","","Show more images");moreImages.type="button";moreImages.hidden=true;moreImages.style.marginTop="12px";panel.append(moreImages);
+ google.target="_blank";google.rel="noopener noreferrer";searchLine.append(webInput,findBtn,google);panelBody.append(searchLine);
+ const providerNotice=make("p","pf-note");providerNotice.hidden=true;panelBody.append(providerNotice);
+ const feedback=make("p","pf-note");feedback.setAttribute("aria-live","polite");const grid=make("div","pf-grid");panelBody.append(feedback,grid);
+ const moreImages=make("button","","Show more images");moreImages.type="button";moreImages.hidden=true;moreImages.style.marginTop="12px";panelBody.append(moreImages);
  actions.after(panel);
  const dialog=make("dialog","pf-modal"),close=make("button","","Close ✕"),titleHeader=make("h2","","Import pattern to family library");
  close.type="button";close.style.float="right";dialog.append(close,titleHeader,make("p","pf-note","Upload a PDF or printable image. An optional preview makes it easy to recognize in search. Files stay private to your signed-in family."));
@@ -32,12 +45,109 @@ actions.append(importBtn,webBtn,libraryTools);
  const link=input("Original source webpage (optional)","url");link.maxLength=1500;
  const preview=input("Preview image (JPG / PNG / WebP)","file");preview.accept=".jpg,.jpeg,.png,.webp";
  const printable=input("Printable file (PDF / image)","file");printable.accept=".pdf,.jpg,.jpeg,.png,.webp";printable.required=true;
+ // A discovered image can be staged locally from its original URL when the
+ // source allows cross-origin fetch. Nothing is uploaded until permission is
+ // confirmed and Upload and add pattern is pressed.
+ const quickImport=make("div","wide");quickImport.hidden=true;
+ quickImport.style.cssText="border:1px solid #668369;border-radius:10px;padding:10px;background:#17271c";
+ const quickPreview=make("img");quickPreview.hidden=true;
+ quickPreview.style.cssText="display:block;width:100%;height:auto;max-height:150px;object-fit:contain;border-radius:6px;background:#0d1911";
+ const quickStatus=make("p","pf-note");quickStatus.setAttribute("aria-live","polite");
+ const quickLinks=make("div");quickLinks.style.cssText="display:flex;flex-wrap:wrap;gap:8px;align-items:center";
+ const retryImage=make("button","","Try automatic image import"),openImage=make("a","","Open original image ↗"),openSource=make("a","","Visit pattern source ↗");
+ retryImage.type="button";
+ for(const a of [openImage,openSource]){a.target="_blank";a.rel="noopener noreferrer";a.style.color="#edb887";}
+ quickLinks.append(retryImage,openImage,openSource);quickImport.append(quickPreview,quickStatus,quickLinks);
+ form.append(quickImport);
  const rights=make("label","wide"),check=document.createElement("input");check.type="checkbox";check.required=true;check.style.width="18px";
  rights.style.cssText="display:flex;gap:8px;flex-direction:row;align-items:start";rights.append(check,document.createTextNode("I have permission to store these selected files privately for our family. Web search previews are not automatically downloaded."));form.append(rights);
  const submit=make("button","wide","Upload and add pattern");submit.type="submit";const formStatus=make("p","pf-note wide");formStatus.setAttribute("aria-live","polite");form.append(submit,formStatus);dialog.append(form);document.body.append(dialog);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
- const openImport=src=>{if(!owner()){alert("Connect a parent account first.");return;}form.reset();category.value="Family imports";webSource=src||null;if(src){title.value=src.title||"";link.value=src.sourceUrl||src.source_url||"";tags.value="pumpkin, carving";}formStatus.textContent=src?"Download an authorized printable file from the source website, then choose that file here.":"Choose your printable PDF/image and optional preview.";dialog.showModal();title.focus()};
+ let stagedOriginal=null,stagedPreview=null,imageOriginalUrl="",imagePreviewUrl="",importAttempt=0;
+ const imageTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
+ async function fetchAuthorizedImage(url,maxBytes=20*1024*1024){
+   if(!safeUrl(url)||url.length>2000)throw Error("No usable HTTPS image link was provided");
+   const signal=typeof AbortSignal.timeout==="function"?AbortSignal.timeout(15000):undefined;
+   const result=await fetch(url,{mode:"cors",credentials:"omit",referrerPolicy:"no-referrer",signal});
+   if(!result.ok||result.type==="opaque")throw Error("Image host blocked the download");
+   const length=Number(result.headers.get("content-length")||0);
+   if(length>maxBytes)throw Error("Image is too large");
+   const blob=await result.blob();
+   const mime=blob.type.split(";")[0].toLowerCase();
+   if(!imageTypes[mime]||!blob.size||blob.size>maxBytes)throw Error("The source did not provide a supported image under 20 MB");
+   const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer());
+   const valid=mime==="image/jpeg"?bytes[0]===255&&bytes[1]===216&&bytes[2]===255:
+     mime==="image/png"?bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71:
+     bytes[0]===82&&bytes[1]===73&&bytes[2]===70&&bytes[3]===70&&bytes[8]===87&&bytes[9]===69&&bytes[10]===66&&bytes[11]===80;
+   if(!valid)throw Error("The downloaded file is not a valid JPG, PNG or WebP image");
+   return new File([blob],"printable-pattern."+imageTypes[mime],{type:mime});
+ }
+ async function tryImageImport(){
+   const attempt=++importAttempt;
+   if(!dialog.open||!webSource)return;
+   retryImage.disabled=true;
+   const original=imageOriginalUrl,thumbnail=imagePreviewUrl;
+   if(!original){quickStatus.textContent="No direct printable image was supplied. Open the original source, save its printable file, and select it above.";}
+   else{
+     quickStatus.textContent="Trying to load the original image into the import form…";
+     try{
+       const file=await fetchAuthorizedImage(original);
+       if(attempt!==importAttempt||!dialog.open)return;
+       stagedOriginal=file;
+       let quality="";
+       if(typeof createImageBitmap==="function"){
+         try{
+           const bitmap=await createImageBitmap(file);
+           if(attempt!==importAttempt){bitmap.close();return;}
+           if(Math.min(bitmap.width,bitmap.height)<450)quality=" Warning: this image may be too small to print sharply.";
+           bitmap.close();
+         }catch{}
+       }
+       quickStatus.textContent="Original image ready ("+(file.size/1048576).toFixed(1)+" MB). Check permission below and select Upload and add pattern."+quality;
+     }catch(e){
+       if(attempt!==importAttempt||!dialog.open)return;
+       quickStatus.textContent="Automatic original-image download wasn't allowed by this site. Open original image or source, save the printable file, then choose it above.";
+     }
+   }
+   if(attempt!==importAttempt||!dialog.open)return;
+   if(!stagedOriginal&&thumbnail){
+     try{const file=await fetchAuthorizedImage(thumbnail,5*1024*1024);
+       if(attempt===importAttempt&&dialog.open){
+         stagedPreview=file;
+         quickStatus.textContent+=" The small search preview was retrieved for the gallery only; a separate printable file is still required.";
+       }
+     }catch{}
+   }
+   if(attempt===importAttempt)retryImage.disabled=false;
+ }
+ retryImage.addEventListener("click",()=>{stagedOriginal=null;stagedPreview=null;void tryImageImport()});
+ printable.addEventListener("change",()=>{
+   if(printable.files[0]&&quickImport.hidden===false)
+     quickStatus.textContent="Selected "+printable.files[0].name+". This file will be used as the printable original. The optional preview can be left blank for JPG/PNG/WebP.";
+ });
+ dialog.addEventListener("close",()=>{importAttempt++;retryImage.disabled=false;});
+ const openImport=src=>{
+   if(!owner()){alert("Connect a parent account first.");return;}
+   importAttempt++;stagedOriginal=null;stagedPreview=null;imageOriginalUrl="";imagePreviewUrl="";
+   form.reset();category.value="Family imports";webSource=src||null;quickImport.hidden=!src;
+   if(src){
+     title.value=src.title||"";
+     link.value=src.sourceUrl||src.source_url||"";
+     tags.value="pumpkin, carving";
+     imageOriginalUrl=safeUrl(src.originalImageUrl||src.original_image_url);
+     imagePreviewUrl=safeUrl(src.thumbnail||src.preview_url);
+     quickPreview.src=imagePreviewUrl||imageOriginalUrl||"";
+     quickPreview.hidden=!quickPreview.src;
+     openImage.href=imageOriginalUrl||imagePreviewUrl||link.value||"#";
+     openImage.hidden=!(imageOriginalUrl||imagePreviewUrl);
+     openSource.href=link.value||"#";openSource.hidden=!safeUrl(link.value);
+     retryImage.disabled=false;quickStatus.textContent="Preparing image import…";
+   }
+   formStatus.textContent=src?"The original image may be imported automatically if its website permits downloads. PDFs still need to be selected manually. Nothing uploads until you confirm permission.":"Choose your printable PDF/image and optional preview.";
+   dialog.showModal();title.focus();
+   if(src)void tryImageImport();
+ };
  let providerConfigured=null,providerChecking=false;
  const recentSearches=new Map();
  let currentWebRequest=0,activeTerm="",panelMode="search",webResults=[],webShown=0,webTerm="";
@@ -62,7 +172,7 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  const webUrl=()=>{google.href="https://www.google.com/search?tbm=isch&q="+encodeURIComponent(webInput.value.trim()+" pumpkin carving stencil printable")};
  const openWeb=q=>{
-   panelMode="search";panel.hidden=false;
+   panelMode="search";expandPanel();
    webInput.value=q||$("search")?.value||"";
    const requested=webInput.value.trim();
    webUrl();panel.scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -103,7 +213,7 @@ actions.append(importBtn,webBtn,libraryTools);
    for(const r of batch){
      if(!safeUrl(r.thumbnail)||!safeUrl(r.sourceUrl))continue;
      const nav=card({name:r.title,image:r.thumbnail,source:r.source,url:r.sourceUrl});
-     const save=make("button","","♡ Save idea"),imp=make("button","","Import file…");
+     const save=make("button","","♡ Save idea"),imp=make("button","","Import image…");
      save.addEventListener("click",()=>saveIdea(r,webTerm,save));
      imp.addEventListener("click",()=>openImport(r));
      nav.append(save,imp);
@@ -165,7 +275,7 @@ actions.append(importBtn,webBtn,libraryTools);
  function showIdeas(){
    if(!owner()){alert("Connect a parent account first.");return;}
    panelMode="ideas";++currentWebRequest;activeTerm="";findBtn.disabled=false;moreImages.hidden=true;
-   panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
+   expandPanel();providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=ideas.length?ideas.length+" saved source links. No files were copied.":"No saved ideas yet. Search the web to save some.";
    for(const idea of ideas){const nav=card({name:idea.title,image:idea.preview_url,source:idea.source_name,url:idea.source_url});
      const imp=make("button","","Import file…"),remove=make("button","","Remove");
@@ -178,7 +288,7 @@ actions.append(importBtn,webBtn,libraryTools);
  function showImports(){
    if(!owner()){alert("Connect the parent account first.");return;}
    panelMode="imports";++currentWebRequest;activeTerm="";findBtn.disabled=false;moreImages.hidden=true;
-   panel.hidden=false;providerNotice.hidden=true;grid.replaceChildren();
+   expandPanel();providerNotice.hidden=true;grid.replaceChildren();
    feedback.textContent=cloudRows.length?cloudRows.length+" imported family templates. Rename or remove a pattern here. Removing also clears its saved favorites and final selections.":"No imports yet. Choose Import pattern to add a PDF or printable image.";
    for(const row of cloudRows){
      const previewUrl=cache.get(row.thumbnail_path)||"";
@@ -207,7 +317,7 @@ actions.append(importBtn,webBtn,libraryTools);
    }
    panel.scrollIntoView({behavior:"smooth",block:"nearest"});
  }
- const imageTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"},originalTypes={...imageTypes,"application/pdf":"pdf"};
+ const originalTypes={...imageTypes,"application/pdf":"pdf"};
  async function put(file,id,label,allowed){
    if(!file)return null;const ext=allowed[file.type];
    if(!ext)throw Error(label+" file type unsupported.");
@@ -218,8 +328,10 @@ actions.append(importBtn,webBtn,libraryTools);
  }
  form.addEventListener("submit",async e=>{
    e.preventDefault();if(!owner()||submit.disabled)return;
-   const previewFile=preview.files[0],originalFile=printable.files[0];
-   if(!originalFile){formStatus.textContent="Choose an original printable PDF or image. A thumbnail alone is not a carving template.";return}
+   const selectedOriginal=printable.files[0];
+   const originalFile=selectedOriginal||stagedOriginal;
+   const previewFile=preview.files[0]||((!selectedOriginal||selectedOriginal.type==="application/pdf")?stagedPreview:null);
+   if(!originalFile){formStatus.textContent="Choose a printable PDF/image. A Google search thumbnail alone is not a printable pattern. If automatic retrieval failed, open the source and save a file first.";return}
    if(link.value&&!safeUrl(link.value)){formStatus.textContent="Source link must be https://";return}
    if(!check.checked){formStatus.textContent="Confirm permission before uploading.";return}
    if(cloudRows.some(row=>row.name.trim().toLowerCase()===title.value.trim().toLowerCase())&&!confirm("A family import already has this title. Add another copy?"))return;
