@@ -65,6 +65,7 @@ actions.append(importBtn,webBtn,libraryTools);
  close.addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
  let webSource=null,ideas=[],cloudRows=[],channel=null,userId=null,loading=false,refreshQueued=false,cache=new Map(),cacheUntil=0;
  let stagedOriginal=null,stagedPreview=null,imageOriginalUrl="",imagePreviewUrl="",importAttempt=0;
+ const normalizeTitle=s=>String(s||"").normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  const imageTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
  async function fetchAuthorizedImage(url,maxBytes=20*1024*1024){
    if(!safeUrl(url)||url.length>2000)throw Error("No usable HTTPS image link was provided");
@@ -287,6 +288,51 @@ actions.append(importBtn,webBtn,libraryTools);
    }
    panel.scrollIntoView({behavior:"smooth",block:"nearest"});
  }
+
+ const editDialog=make("dialog","pf-modal"),editClose=make("button","","Close ✕"),editForm=make("form","pf-form");
+ editClose.type="button";editClose.style.float="right";
+ const editField=(label)=>{
+   const parent=make("label","",label),el=make("input");el.type="text";el.maxLength=250;
+   parent.append(el);editForm.append(parent);return el;
+ };
+ const editName=editField("Title"),editCategory=editField("Category / theme"),editTags=editField("Tags (comma-separated)"),editDifficulty=editField("Difficulty");
+ const editFileWrap=make("label","wide","Replace thumbnail (optional)"),editFile=make("input");
+ editFile.type="file";editFile.accept=".jpg,.jpeg,.png,.webp";editFileWrap.append(editFile);editForm.append(editFileWrap);
+ const editStatus=make("p","pf-note wide");editStatus.setAttribute("aria-live","polite");
+ const editSave=make("button","wide","Save changes");editSave.type="submit";editForm.append(editSave,editStatus);
+ editDialog.append(editClose,make("h2","","Edit imported design"),editForm);document.body.append(editDialog);
+ editClose.addEventListener("click",()=>editDialog.close());
+ let editing=null;
+ function openEdit(row){
+   editing=row;editForm.reset();editName.value=row.name||"";
+   editCategory.value=row.category||"Family imports";editTags.value=(row.tags||[]).join(", ");
+   editDifficulty.value=row.difficulty||"";editStatus.textContent="";
+   editDialog.showModal();editName.focus();
+ }
+ editForm.addEventListener("submit",async e=>{
+   e.preventDefault();const row=editing,uid=owner();if(!row||!uid||editSave.disabled)return;
+   const name=editName.value.trim().slice(0,160);
+   if(!name){editStatus.textContent="Enter a title.";return;}
+   if(cloudRows.some(x=>x.id!==row.id&&normalizeTitle(x.name)===normalizeTitle(name))
+     &&!confirm("Another design has a similar name. Save anyway?"))return;
+   editSave.disabled=true;editStatus.textContent="Saving changes…";let newPath=null,success=false;
+   try{
+     if(editFile.files[0])newPath=await put(editFile.files[0],crypto.randomUUID(),"edited-preview",imageTypes);
+     const changes={name,category:(editCategory.value.trim()||"Family imports").slice(0,80),
+       tags:editTags.value.split(",").map(x=>x.trim().slice(0,50)).filter(Boolean).slice(0,12),
+       difficulty:editDifficulty.value.trim().slice(0,40),updated_at:new Date().toISOString()};
+     if(newPath)changes.thumbnail_path=newPath;
+     const {error}=await client().from("pc_imports").update(changes).eq("id",row.id).eq("user_id",uid);
+     if(error)throw error;success=true;
+     editDialog.close();editing=null;await refreshImports();showImports();
+     if(newPath&&row.thumbnail_path&&row.thumbnail_path!==row.original_path){
+       const cleanup=await client().storage.from("pc-family-imports").remove([row.thumbnail_path]);
+       if(cleanup.error)console.warn("Old thumbnail could not be removed",cleanup.error);
+     }
+   }catch(e){if(newPath&&!success)await client().storage.from("pc-family-imports").remove([newPath]);editStatus.textContent="Could not save: "+e.message;}
+   finally{editSave.disabled=false;}
+ });
+
  function showImports(){
    if(!owner()){alert("Connect the parent account first.");return;}
    panelMode="imports";++currentWebRequest;activeTerm="";findBtn.disabled=false;moreImages.hidden=true;
@@ -295,14 +341,8 @@ actions.append(importBtn,webBtn,libraryTools);
    for(const row of cloudRows){
      const previewUrl=cache.get(row.thumbnail_path)||"";
      const nav=card({name:row.name,image:previewUrl,source:row.category+" · Family library",url:row.source_url});
-     const edit=make("button","","Rename"),remove=make("button","","Delete");
-     edit.addEventListener("click",async()=>{
-       const proposed=prompt("Rename imported pattern:",row.name);
-       if(proposed===null)return;
-       const next=proposed.trim().slice(0,160);if(!next)return;
-       const {error}=await client().from("pc_imports").update({name:next,updated_at:new Date().toISOString()}).eq("id",row.id).eq("user_id",owner());
-       if(error)alert(error.message);else{await refreshImports();showImports()}
-     });
+     const edit=make("button","","Edit details"),remove=make("button","","Delete");
+     edit.addEventListener("click",()=>openEdit(row));
      remove.addEventListener("click",async()=>{
        if(!confirm("Permanently remove “"+row.name+"” from the family library and clear its favorites/final picks? This cannot be undone."))return;
        remove.disabled=true;
@@ -332,13 +372,18 @@ actions.append(importBtn,webBtn,libraryTools);
    e.preventDefault();if(!owner()||submit.disabled)return;
    const selectedOriginal=printable.files[0];
    const originalFile=selectedOriginal||stagedOriginal;
-   const previewFile=preview.files[0]||((!selectedOriginal||selectedOriginal.type==="application/pdf")?stagedPreview:null);
+   let previewFile=preview.files[0]||((!selectedOriginal||selectedOriginal.type==="application/pdf")?stagedPreview:null);
    if(!originalFile){formStatus.textContent="Choose a printable PDF/image. A Google search thumbnail alone is not a printable pattern. If automatic retrieval failed, open the source and save a file first.";return}
    if(link.value&&!safeUrl(link.value)){formStatus.textContent="Source link must be https://";return}
    if(!check.checked){formStatus.textContent="Confirm permission before uploading.";return}
-   if(cloudRows.some(row=>row.name.trim().toLowerCase()===title.value.trim().toLowerCase())&&!confirm("A family import already has this title. Add another copy?"))return;
+   if(cloudRows.some(row=>normalizeTitle(row.name)===normalizeTitle(title.value))&&!confirm("A family import has a very similar name. Add a separate copy?"))return;
    submit.disabled=true;formStatus.textContent="Uploading privately…";const id=crypto.randomUUID(),uploaded=[];
    try{
+     if(originalFile.type==="application/pdf"&&!previewFile){
+       formStatus.textContent="Creating a thumbnail from the PDF's first page…";
+       try{previewFile=await (await import("./pdf-preview.js")).makePdfThumbnail(originalFile);}
+       catch(error){console.warn("PDF preview unavailable",error);formStatus.textContent="PDF thumbnail unavailable. Importing with a placeholder; you can replace the preview later.";}
+     }
      let p=await put(previewFile,id,"preview",imageTypes);if(p)uploaded.push(p);
      const o=await put(originalFile,id,"original",originalTypes);if(o)uploaded.push(o);
      if(!p&&originalFile&&imageTypes[originalFile.type])p=o;

@@ -36,7 +36,7 @@ Supabase persists browser sessions, but sessions can expire or be cleared. An em
 
 The account's private Supabase Storage already contains all 2,053 original preview images. **There is no need to upload them again.** If a future device reports missing previews, confirm it is signed into the same account, then refresh the page. A troubleshooting uploader is available in **Family account settings → Upload photos for all family devices**, but it should only be used for an actual missing/failed upload. Original licensed PDFs are not hosted publicly.
 
-Family imports use the separate private `pc-family-imports` bucket. A printable PDF/image is required; an optional JPG, PNG or WebP thumbnail improves the gallery preview. Without a separate image thumbnail, imported PDFs use a pumpkin placeholder, not an automatically generated PDF preview. Supported uploads are limited to **20 MB per file**. Source attribution is optional, and duplicate titles produce a confirmation rather than automatic merging.
+Family imports use the separate private `pc-family-imports` bucket. A printable PDF/image is required; an optional JPG, PNG or WebP thumbnail improves the gallery preview. When a PDF is imported without a separate thumbnail, the app tries to generate a private first-page preview in the browser using PDF.js 4.10.38. If this fails, the PDF can still import with a placeholder and its thumbnail can be edited later. Supported uploads are limited to **20 MB per file**. Source attribution is optional. Similar normalized titles trigger a confirmation instead of silently importing duplicates. **Manage imports → Edit details** can update name, category, search tags, difficulty and replace a thumbnail without changing the pattern ID or family selections.
 
 ## Offline search suggestions and typo handling
 
@@ -89,7 +89,7 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 
 ## Security and architecture
 
-- **Frontend:** Static `index.html`, `family-sync.js`, `family-features.js`, `search-suggestions.js` and `cloud-config.js`, hosted on GitHub Pages (public source).
+- **Frontend:** Static `index.html`, `family-sync.js`, `family-features.js`, `pdf-preview.js`, `search-suggestions.js` and `cloud-config.js`, hosted on GitHub Pages (public source).
 - **Cloud:** Supabase Auth, account-scoped Postgres RLS on `pc_accounts`, `pc_people`, `pc_choices`, `pc_imports`, `pc_web_ideas`, and `pc_search_logs`; realtime publication for the family-facing choice/import tables.
 - **Storage:** Both `pc-previews` and `pc-family-imports` are **private** and use account-scoped object paths; signed URLs have time limits.
 - **Image discovery:** Deployed `pumpkin-image-search` Edge Function calls SerpApi server-side, with a server-held `SERPAPI_KEY`. It uses gateway `verify_jwt: false` with **manual user token and family-account verification inside the function**; do not remove those internal checks.
@@ -105,4 +105,4 @@ The locally repaired `START_HERE.html` and any repair ZIPs distributed outside t
 
 **Engineering checks completed:** Repository bridge and feature wiring reviewed; private buckets and their uploaded preview counts checked; schema RLS and realtime publication reviewed; JavaScript syntax checked. There is still one Supabase Auth advisory about disabled leaked-password protection (which may depend on plan). [Supabase security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 
-**Still to acceptance-test:** A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, expansion of 48-image responses with a live SerpApi search, and the new best-effort browser auto-fetch/import flow against real image hosts. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.
+**Still to acceptance-test:** PDF first-page rendering on a real family browser and metadata/thumbnail editing on a signed-in account, plus  A parent sign-in on a new device, full 2-device favorites/Final Picks sync, actual PDF/image upload and printable-original access, signed-URL refresh behavior, search suggestions in real mobile/desktop browsers, expansion of 48-image responses with a live SerpApi search, and the new best-effort browser auto-fetch/import flow against real image hosts. Google Images cards have already been confirmed working by the user. Avoid claiming those tests have passed without real results.
