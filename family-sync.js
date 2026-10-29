@@ -383,16 +383,16 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  closePrint.addEventListener('click',()=>printDialog.close());
  printDialog.addEventListener('click',e=>{if(e.target===printDialog)printDialog.close()});
  document.addEventListener('click',event=>{
-   const link=event.target.closest('a[href]');
-   if(!link||!(link.classList.contains('pdf')||link.id==='preview-original'))return;
-   const href=decodeURIComponent(link.getAttribute('href')||'');
-   if(!/^(Templates|Additional_Templates)\//i.test(href))return;
-   event.preventDefault();
-   currentPrintItem=window.allData?.().find(x=>x.path===href);
-   if(!currentPrintItem)return;
-   printTitle.textContent='Find the original: '+currentPrintItem.name;
-   drawPath();
-   printDialog.showModal();
+  const link=event.target.closest('a[data-original-id],a.pdf,a#preview-original,a[href]');
+  if(!link)return;
+  let relative='';try{relative=decodeURIComponent(link.getAttribute('href')||'');}catch{}
+  if(!link.dataset.originalId&&!/^(Templates|Additional_Templates)\//i.test(relative))return;
+  const catalog=window.allData?.()||[];
+  const item=(link.dataset.originalId&&catalog.find(x=>x.id===link.dataset.originalId))||catalog.find(x=>x.path===relative);
+  if(!item||!item.path||item.path.startsWith('https://'))return;
+  event.preventDefault();
+  currentPrintItem=item;printTitle.textContent='Find the original: '+item.name;
+  drawPath();printDialog.showModal();
  },true);
  function updateOriginalLabels(){
    document.querySelectorAll('a.pdf').forEach(a=>{if(!/^https:\/\//i.test(a.getAttribute('href')||'')&&a.textContent!=='Find original ↗')a.textContent='Find original ↗'});

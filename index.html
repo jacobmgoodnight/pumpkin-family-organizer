@@ -234,7 +234,19 @@ body{background:var(--bg)}
 /* Hosted clients must authenticate before showing a private image gallery. */
 body.cloud-gated main.workspace, body.cloud-gated #sticky-quick-search{display:none!important}
 </style>
-</head>
+<style>
+.family-print-item{display:flex;gap:12px;align-items:center;break-inside:avoid;min-width:0}
+.family-print-preview{width:86px;height:104px;object-fit:contain;flex:none;border-radius:7px}
+.family-print-info{display:flex;flex-direction:column;gap:5px;min-width:0;overflow-wrap:anywhere}
+@media(max-width:520px){.family-print-item{gap:8px}.family-print-preview{width:65px;height:80px}}
+@media print{@page{margin:.5in}body *{visibility:hidden!important}
+#summary,#summary *{visibility:visible!important}
+#summary{position:absolute!important;inset:0 auto auto 0;width:100%!important;background:#fff!important;color:#111!important}
+#summary button,#summary a{display:none!important}
+#summary .overview-member,#summary .overview-item{break-inside:avoid;background:#fff!important;color:#111!important;box-shadow:none!important;border-color:#aaa!important}
+#summary .muted,#summary strong,#summary h3{color:#111!important}
+}
+</style></head>
 <body>
 <header class="top"><div class="shell"><div class="eyebrow">Goodnight family / Carving night</div><h1>Find your perfect pumpkin. 🎃</h1><p>Browse designs, save favorites, and choose your pumpkin.</p><div class="header-meta" aria-label="Available carving templates"><span class="meta-pill meta-total"><b id="all-total">2,053</b> carving templates</span><span class="meta-pill"><b id="zp-total">661</b> curated Zombie Pumpkins</span><span class="meta-pill"><b id="extra-total">1,392</b> additional designs</span></div></div></header>
 <div id="sticky-quick-search" class="sticky-quick-search" hidden aria-label="Quick pumpkin search"><div class="sticky-quick-inner"><label for="sticky-search" class="sticky-search-caption">⌕ Search</label><input id="sticky-search" type="search" autocomplete="off" placeholder="Search pumpkin designs…" aria-label="Quick search pumpkin designs"><button type="button" class="button small quiet" id="sticky-filters">Filters ↑</button></div></div>
@@ -418,6 +430,14 @@ function findVisible(){const query=getQueryTerms();const source=$('source').valu
  const score=searchScore(x,query.terms,query.raw);if(!score)return false;scores.set(x.id,score);return true;
  });return sortVisible(matches,scores)}
 function fileHref(path){return /^https:\/\//.test(path)?path:path.split('/').map(encodeURIComponent).join('/')}
+function originalAction(x){
+ if(!x?.path)return createElement('span','muted','Preview only · No printable original');
+ const isCloud=x.path.startsWith('https://');
+ const a=createElement('a','pdf',isCloud?'Open printable ↗':'Find original ↗');
+ if(isCloud){a.href=x.path;a.target='_blank';a.rel='noopener noreferrer';}
+ else{a.href='#';a.dataset.originalId=x.id;a.title='Find the original in your local library';}
+ return a;
+}
 function cardFor(x,favorites,picks){const card=createElement('article','card');if(picks.has(x.id))card.classList.add('selected');const imageLink=createElement('button','preview-open');imageLink.type='button';imageLink.title='Enlarge '+x.name;imageLink.setAttribute('aria-label','Enlarge preview: '+x.name);const img=document.createElement('img');img.src=x.thumbnail;img.alt=x.name+' carving preview';img.loading='lazy';img.decoding='async';imageLink.append(img);imageLink.addEventListener('click',()=>openPreview(x.id));
  const heart=createElement('button','heart',favorites.has(x.id)?'♥':'♡');heart.type='button';heart.title=(favorites.has(x.id)?'Remove from':'Add to')+' '+currentPerson().name+' favorites';heart.setAttribute('aria-label',heart.title+': '+x.name);heart.setAttribute('aria-pressed',String(favorites.has(x.id)));heart.addEventListener('click',()=>toggleFavorite(x.id));
  const preview=createElement('div','preview');preview.append(imageLink,heart);if(picks.has(x.id))preview.append(createElement('span','chosen-chip','🎃 My pumpkin!'));const others=otherPicksLabel(x.id);if(others)preview.append(createElement('span','other-picked-chip',others));
@@ -427,7 +447,7 @@ function cardFor(x,favorites,picks){const card=createElement('article','card');i
    compare.type='button';compare.setAttribute('aria-pressed',String(marked));compare.setAttribute('aria-label',(marked?'Remove from comparison: ':'Add to comparison: ')+x.name);
    compare.addEventListener('click',()=>toggleCompare(x.id));preview.append(compare);
  }const body=createElement('div','card-body');const label=createElement('span','card-label',x.source==='zombie'?'★ Zombie Pumpkins · Curated':x.source==='family'?'♥ Family import':'Additional · '+x.category);const title=createElement('h3','',x.name);const subtitle=createElement('div','card-sub',x.theme+(x.difficulty?' · '+x.difficulty:''));subtitle.title='Original category: '+x.category+(x.tags.length?' · '+x.tags.join(', '):'');
- const actions=createElement('div','card-action');if(view!=='all'&&x.path){const isPDF=/\.pdf(?:$|\?)/i.test(x.path);const pdf=createElement('a','pdf',isPDF?'Open PDF ↗':'Open file ↗');pdf.href=fileHref(x.path);pdf.target='_blank';pdf.rel='noopener';pdf.title='Open original '+x.name;actions.append(pdf);}
+ const actions=createElement('div','card-action');if(view!=='all')actions.append(originalAction(x));
  if(view==='favorites'||view==='picks'){
    const pick=createElement('button','pick',picks.has(x.id)?'🎃 My pumpkin!':'Choose this');pick.type='button';pick.setAttribute('aria-pressed',String(picks.has(x.id)));pick.setAttribute('aria-label',(picks.has(x.id)?'Remove final pick':'Choose as final pick')+': '+x.name);pick.addEventListener('click',()=>togglePick(x.id));actions.append(pick);
  }body.append(title,subtitle,label);if(actions.childElementCount)body.append(actions);else card.classList.add('browse-card');card.append(preview,body);return card}
@@ -466,7 +486,7 @@ function renderCompare(){
    const img=document.createElement('img');img.src=x.thumbnail;img.alt=x.name+' enlarged carving preview';img.loading='eager';link.append(img);
    if(picks.has(x.id))item.append(createElement('span','compare-chosen','🎃 My pumpkin!'));
    const info=createElement('div','compare-item-info');const others=otherPicksLabel(x.id);if(others)info.append(createElement('span','other-picked-compare',others));const label=createElement('span','card-label',x.source==='zombie'?'★ ZOMBIE PUMPKINS':'ADDITIONAL COLLECTION');const name=createElement('h3','',x.name);const category=createElement('div','card-sub',x.theme+(x.difficulty?' · '+x.difficulty:''));
-   const actions=createElement('div','card-action');const original=createElement('a','pdf','Open original ↗');original.href=fileHref(x.path);original.target='_blank';original.rel='noopener';
+   const actions=createElement('div','card-action');const original=originalAction(x);
    const choose=createElement('button','pick',picks.has(x.id)?'🎃 My pumpkin!':'Choose this');choose.type='button';choose.setAttribute('aria-pressed',String(picks.has(x.id)));choose.setAttribute('aria-label',(picks.has(x.id)?'Unchoose ':'Choose ')+x.name+' as final pumpkin');
    choose.addEventListener('click',()=>{togglePick(x.id);renderCompare()});
    actions.append(original,choose);info.append(label,name,category,actions);item.append(link,info);host.append(item);
@@ -495,14 +515,40 @@ function renderPreview(){
  const favorite=$('preview-favorite');const isFavorite=favorites.has(current.id);
  favorite.textContent=isFavorite?'♥ Saved to favorites':'♡ Save to my favorites';favorite.setAttribute('aria-pressed',String(isFavorite));
  favorite.setAttribute('aria-label',(isFavorite?'Remove from':'Save to')+' '+currentPerson().name+' favorites: '+current.name);
- $('preview-original').hidden=!current.path;if(current.path){$('preview-original').href=fileHref(current.path);$('preview-original').textContent=/\.pdf(?:$|\?)/i.test(current.path)?'Open PDF to print ↗':'Open original to print ↗';}
+ $('preview-original').hidden=!current.path;
+ if(current.path){
+  const privateLink=current.path.startsWith('https://');
+  $('preview-original').href=privateLink?current.path:'#';
+  $('preview-original').textContent=privateLink?'Open printable ↗':'Find original ↗';
+  if(privateLink){delete $('preview-original').dataset.originalId;$('preview-original').target='_blank'}
+  else{$('preview-original').dataset.originalId=current.id;$('preview-original').removeAttribute('target')}
+ }else delete $('preview-original').dataset.originalId;
  const pick=$('preview-pick');pick.hidden=view==='all';pick.textContent=picks.has(current.id)?'🎃 This is my pumpkin!':'🎃 Choose this pumpkin';pick.setAttribute('aria-pressed',String(picks.has(current.id)));
  pick.classList.toggle('chosen-action',picks.has(current.id));
  $('preview-prev').disabled=idx<=0;$('preview-next').disabled=idx<0||idx>=list.length-1;
  $('preview-position').textContent=idx<0?'No longer in this view':(idx+1)+' of '+list.length+(previewContext==='compare'?' compared':'');
 }
 function movePreview(delta){const list=previewItems(),idx=list.findIndex(x=>x.id===previewID);const next=idx+delta;if(next>=0&&next<list.length){previewID=list[next].id;renderPreview()}}
-function renderSummary(){const host=$('summary-list');host.replaceChildren();const catalog=new Map(allData().map(x=>[x.id,x]));let n=0;for(const member of app.people){const ids=app.picks[member.id]||[];const group=createElement('section','overview-member');const heading=createElement('h3','',member.name+' — '+ids.length+' final '+(ids.length===1?'pick':'picks'));group.append(heading);const row=createElement('div','overview-items');if(!ids.length)row.append(createElement('span','muted','No final picks yet'));for(const id of ids){const x=catalog.get(id);const label=createElement('div','overview-item');if(x){if(x.path){const link=createElement('a','',x.name+' ↗');link.href=fileHref(x.path);link.target='_blank';link.rel='noopener';label.append(link)}else label.append(createElement('span','',x.name+' (preview only)'));label.append(createElement('div','',x.category))}else{label.textContent='Unavailable template ('+id+')'}row.append(label)}group.append(row);host.append(group);n+=ids.length}if(!n)host.prepend(createElement('p','muted','Nobody has made a final pick yet. Choose a person, save designs with ♥, then choose a final pick in My favorites.'))}
+function renderSummary(){
+ const host=$('summary-list');host.replaceChildren();
+ const catalog=new Map(allData().map(x=>[x.id,x]));let total=0;
+ for(const person of app.people){
+  const ids=app.picks[person.id]||[],section=createElement('section','overview-member');
+  section.append(createElement('h3','',person.name+' — '+ids.length+' final '+(ids.length===1?'pick':'picks')));
+  const row=createElement('div','overview-items');
+  if(!ids.length)row.append(createElement('span','muted','No final design chosen yet'));
+  for(const id of ids){
+   const x=catalog.get(id),entry=createElement('div','overview-item family-print-item');
+   if(!x){entry.textContent='Unavailable template ('+id+')';row.append(entry);continue;}
+   const img=document.createElement('img');img.src=x.thumbnail;img.alt=x.name+' carving preview';img.loading='lazy';img.className='family-print-preview';
+   const info=createElement('div','family-print-info');
+   info.append(createElement('strong','',x.name),createElement('span','muted',x.source==='family'?'♥ Family import':x.source==='zombie'?'★ Zombie Pumpkins':'Additional collection'),originalAction(x));
+   entry.append(img,info);row.append(entry);
+  }
+  section.append(row);host.append(section);total+=ids.length;
+ }
+ if(!total)host.prepend(createElement('p','muted','No final design selected. Save favorites, compare, and choose a pumpkin.'));
+}
 function renderAll(){syncStickySearch();syncDifficultyFilter();$('sort').querySelector('[value=recent]').hidden=view!=='favorites';if(view!=='favorites'&&$('sort').value==='recent')$('sort').value='az';renderProfiles();updateHeader();$('catalog-area').hidden=view==='summary';$('summary').hidden=view!=='summary';if(view==='summary')renderSummary();else renderGallery();updateStickyVisibility()}
 function setView(next){if($('preview-dialog').open)$('preview-dialog').close();view=next;compareSelection.clear();if(next==='favorites'||next==='picks'){$('source').value='';$('category').value='';$('difficulty').value='';$('search').value='';}visible=96;renderFilters();renderAll()}
 function updateSet(key,id,shouldAdd){const set=selectedSet(app[key]);shouldAdd?set.add(id):set.delete(id);app[key][app.active]=[...set];saveApp();renderAll()}
@@ -530,7 +576,7 @@ function clearFilters(){if(queryTimer)clearTimeout(queryTimer);$('search').value
 function download(name,text,format){const a=document.createElement('a'),blob=new Blob([text],{type:format||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function readableList(finalOnly=false){const lookup=new Map(allData().map(x=>[x.id,x]));const text=['GOODNIGHT FAMILY · PUMPKIN CARVING SELECTIONS','',new Date().toLocaleDateString(),''];for(const person of app.people){text.push(person.name,'='.repeat(person.name.length));for(const [title,kind] of (finalOnly?[['Final picks','picks']]:[['Final picks','picks'],['Favorites','favorites']])){text.push(title+':');const ids=app[kind][person.id]||[];if(!ids.length)text.push('  (none)');for(const id of ids){const x=lookup.get(id);text.push('  • '+(x?x.name+' | '+x.category+' | '+x.path:'Unavailable template: '+id))}text.push('')}text.push('')}return text.join('\n')}
 function exportBackup(){const payload={format:'goodnight-pumpkin-family-backup',version:2,exportedAt:new Date().toISOString(),state:app};download('Pumpkin_Family_Backup.json',JSON.stringify(payload,null,2),'application/json')}
-function restoreBackup(file){if(!file)return;file.text().then(s=>{const parsed=JSON.parse(s);if(parsed.format!=='goodnight-pumpkin-family-backup'||parsed.version!==2||!isObj(parsed.state))throw new Error('Not a supported family backup');if(!confirm('Restore this backup? It will replace current profiles, favorites, and final picks. Your template files will not change.'))return;app=normalizeApp(parsed.state);saveApp();view='all';visible=96;renderAll();alert('Family backup restored.')}).catch(e=>alert('Could not restore backup: '+e.message));$('backup-input').value=''}
+function restoreBackup(file){if(!file)return;file.text().then(s=>{const parsed=JSON.parse(s);if(parsed.format!=='goodnight-pumpkin-family-backup'||parsed.version!==2||!isObj(parsed.state))throw new Error('Not a supported family backup');if(!confirm('Restoring while signed in also syncs these profiles and selections to the cloud, possibly changing choices on other devices. Back up current selections first. Pattern files are unchanged. Continue?'))return;app=normalizeApp(parsed.state);saveApp();view='all';visible=96;renderAll();alert('Family backup restored.')}).catch(e=>alert('Could not restore backup: '+e.message));$('backup-input').value=''}
 function showPeople(){
  const host=$('people-list');host.replaceChildren();for(const p of app.people){
   const line=createElement('div','dialog-person');line.append(createElement('strong','',p.name));const actions=createElement('div','person-actions');
