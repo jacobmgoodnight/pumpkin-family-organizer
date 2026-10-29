@@ -8,6 +8,8 @@ export function init({getClient,getOwner,bridge}){
  const importBtn=make("button","pf-primary","＋ Import pattern"),webBtn=make("button","","🌐 Find more online"),ideasBtn=make("button","","♡ Saved web ideas"),manageBtn=make("button","","Manage imports"),helpBtn=make("button","","Help");
  actions.append(importBtn,webBtn,ideasBtn,manageBtn,helpBtn);
  (document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
+ // Search all collections by default; curated Zombie Pumpkins still wins close relevance ties.
+ const initialSource=$("source");if(initialSource&&initialSource.value==="zombie"){initialSource.value="";initialSource.dispatchEvent(new Event("change",{bubbles:true}));}
  const panel=make("section","pf-panel");panel.hidden=true;panel.append(make("h3","","Find more printable designs"));
  panel.append(make("p","pf-note","External results are suggestions, not part of your library. Check the original source and usage rights before importing."));
  const searchLine=make("div","pf-search"),webInput=document.createElement("input"),findBtn=make("button","pf-primary","Search Google Images"),google=make("a","","Open Google Images ↗");
