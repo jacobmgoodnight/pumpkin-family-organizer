@@ -33,3 +33,26 @@
  .pf-card nav{flex-direction:column}
  .pf-card nav button,.pf-card nav a{width:100%;box-sizing:border-box}
 }
+
+/* Organizer has a small connected status; settings and shared-link manager
+   stay under the existing collapsible Family account settings. */
+body.family-connected #cloud-family-panel{padding:8px 12px;margin:7px auto;max-width:1080px;border-radius:9px}
+body.family-connected #cloud-family-panel .cloud-line{gap:8px}
+body.family-connected #cloud-family-panel #cloud-status{font-size:12px}
+body.family-connected #cloud-family-panel #cloud-help,
+body.family-connected #cloud-family-panel #cloud-child-setup{display:none!important}
+body.family-connected #cloud-account-settings:not([open]){padding:5px 0 0;border-top:0}
+body.family-connected #cloud-account-settings:not([open])>summary{font-size:12px}
+@media screen and (max-width:700px){
+ body.family-connected .top{padding:8px 0 10px}
+ body.family-connected .top h1{font-size:22px}
+ body.family-connected .top p{display:none}
+ body.family-connected .header-meta{display:none}
+ body.family-connected .workspace{padding-top:9px}
+ body.family-connected .profile-panel{padding:11px 12px}
+ body.family-connected .profiles{margin-top:8px}
+ body.family-connected .utility-row{padding:10px 0 7px;gap:7px}
+ body.family-connected .headline h2{font-size:18px}
+ body.family-connected .headline p{display:none}
+ #family-profile-invites button{max-width:100%;overflow-wrap:anywhere}
+}

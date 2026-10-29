@@ -8,7 +8,7 @@ const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status
 const fail=(message:string,status=400)=>reply({error:message},status);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN=/^[a-zA-Z0-9_-]{43}$/;
-const BUILTIN=/^(?:Thumbnails\/[a-f0-9]{16}\.jpg|Additional_Thumbnails\/[a-f0-9]{16}\.(?:jpg|png|webp))$/i;
+const BUILTIN=/^(?:Thumbnails\/[a-f0-9]{16,48}\.jpg|Additional_Thumbnails\/[a-f0-9]{16,48}\.(?:jpg|png|webp))$/i;
 const text=(v:unknown,max:number)=>typeof v==="string"&&v.length<=max?v:null;
 const bytesToHex=(bytes:Uint8Array)=>Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
 async function digest(v:string){return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v))));}
@@ -17,7 +17,8 @@ function key(){
  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"";
-const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+const SERVICE_KEYS=Deno.env.get("SUPABASE_SECRET_KEYS");
+const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||(()=>{try{return JSON.parse(SERVICE_KEYS||"{}").default||"";}catch{return"";}})();
 Deno.serve(async(request)=>{
  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
  if(request.method!=="POST")return fail("Method not allowed",405);

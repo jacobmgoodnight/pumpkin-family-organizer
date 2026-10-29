@@ -1,7 +1,7 @@
 // One-profile guest portal. The bearer token is received in a URL fragment,
 // moved to tab-local sessionStorage, and never sent in a URL or to Google.
 const config=window.PUMPKIN_CLOUD_CONFIG;
-const API="https://wljddcebgmqzrgxjebkn.supabase.co/functions/v1/pumpkin-profile-invites";
+const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
 const $=id=>document.getElementById(id);
 const escaped=new URLSearchParams(location.hash.slice(1)).get("invite");
 if(escaped&&/^[A-Za-z0-9_-]{43}$/.test(escaped)){
@@ -12,7 +12,7 @@ const token=sessionStorage.getItem("pumpkin-person-invite");
 let catalog=[],info=null,choices=new Map(),matches=[],visible=24,previewCache=new Map(),loadingImages=false;
 const notice=s=>{$("alert").textContent=s;};
 const api=async body=>{
- const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","apikey":"",},body:JSON.stringify({...body,token}),referrerPolicy:"no-referrer",cache:"no-store"});
+ const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","apikey":config?.publishableKey||"",},body:JSON.stringify({...body,token}),referrerPolicy:"no-referrer",cache:"no-store"});
  const data=await response.json().catch(()=>({error:"Connection unavailable"}));
  if(!response.ok||data.error)throw Error(data.error||"Connection unavailable");
  return data;
@@ -117,6 +117,7 @@ $("more").addEventListener("click",()=>{visible+=24;render();});
 $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-person-invite");location.href="./";});
 async function start(){
  if(!token){notice("No invitation was found. Ask the organizer to share your private link again.");return;}
+ if(!config?.url||!config?.publishableKey){notice("Private gallery configuration is unavailable.");return;}
  try{
    notice("Opening your private invitation…");
    const results=await Promise.all([

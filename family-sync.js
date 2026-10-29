@@ -96,6 +96,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    $('cloud-password-setup').style.display=$('cloud-password-setup').hidden?'none':'grid';
    if(!connected){$('cloud-password-setup').dataset.open='';}
    document.body.classList.toggle('cloud-gated',!connected);
+   document.body.classList.toggle('family-connected',!!connected);
    quickPeople.hidden=true;quickPeople.style.display='none';parentInfo.hidden=connected;
    $('cloud-help').hidden=connected;
    $('cloud-account-settings').hidden=!connected;
@@ -340,6 +341,9 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    try{
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+     import('./family-invites.js').then(module=>module.init({
+       getClient:()=>client,getOwner:()=>owner,bridge,settings:accountSettings
+     })).catch(error=>console.warn("Family invitation manager unavailable",error));
      async function onSession(session){
        if(!session?.user){owner=null;outbox=[];last=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
