@@ -1,0 +1,19 @@
+{
+  "id": "/pumpkin-family-organizer/",
+  "name": "Goodnight Family Pumpkin Organizer",
+  "short_name": "Pumpkin Night",
+  "description": "Carving pattern favorites and private family library",
+  "start_url": "/pumpkin-family-organizer/",
+  "scope": "/pumpkin-family-organizer/",
+  "display": "standalone",
+  "background_color": "#111817",
+  "theme_color": "#17241e",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
