@@ -45,3 +45,12 @@ Use the same **existing parent email address** used for this family organizer. *
 ## Import a Google image from your phone
 
 Select **Import image** on a Google Images card. If the original can be fetched, you'll see **Full-size original staged**; it still hasn't been uploaded. Confirm permission and select **Upload and add pattern**. If the host blocks the fetch, open the source, save an authorized printable image/PDF to Photos or Files, then choose **Choose file from phone or computer** in the same import form. The little Google Images thumbnail is not automatically a usable printable.
+
+
+## Invite each person with their own private link
+
+Parent: Sign in, expand **Family account settings → Share private family links**, select the expiration, then choose **Create private link** next to the person. Use **Share…** to send it by Messages/AirDrop or **Copy link** and paste into a trusted chat. No separate child email is required.
+
+Recipient: Tap your personal link. You will see your own favorite and final-pick controls. You cannot change another person's picks or see the parent's settings. The link works until it expires or the parent revokes it.
+
+Privacy: Anyone who receives the link can act as that person, so do not post it publicly. Parent can revoke it or generate a replacement; old links stop working.

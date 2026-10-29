@@ -66,3 +66,16 @@ GitHub Actions runs the same suite on commits/PRs. Tests cover the 661 + 1,392 b
 Email links use `signInWithOtp` with `shouldCreateUser: false`. For failures such as “Signups not allowed for OTP,” verify that the supplied address is the **existing confirmed family account**, OTP/email authentication is permitted in Supabase, and that the GitHub Pages URL is in Auth → URL Configuration. **Do not enable open registrations just to get email links working.** Password setup and resets use `resetPasswordForEmail`, an existing-account recovery redirect, `PASSWORD_RECOVERY` and authenticated `updateUser`. Default Supabase email limits still apply. Recovery responses deliberately do not reveal whether an address exists.
 
 The `mobile-polish.css` file is loaded after the inline styles and provides a grid rather than a wrapping flex row for Sort, Surprise and Clear filters. It also sizes inputs at 16px to avoid iPhone Safari zoom. Test at CSS viewport widths 320, 375, 390, 430 and 768 px. GitHub CI only validates CSS structure; it does not visually emulate Safari.
+
+
+## Invite-only guest portal and scoped server API
+
+The deployed Supabase function `pumpkin-profile-invites` uses a server-held key and manually verifies either the real parent JWT (`list`, `create`, `revoke`) or a single-person 256-bit bearer token (`guest`, `choice`, `thumbs`, `print`). The function is deployed with `verify_jwt: false` because guests authenticate with their own bearer capability. Keep its internal checks.
+
+Creating a link revokes prior live links for that person, stores only a SHA-256 token hash in `pc_profile_invites`, and returns the plaintext token only once. Links expire after 7, 14 or 30 days. The guest portal stores it in sessionStorage and removes the fragment from its visible URL. Parent can revoke the link immediately.
+
+`pc_profile_invites` is intentionally **RLS enabled with zero policies and zero grants to anon/authenticated**. The Supabase advisor's `rls_enabled_no_policy` INFO finding is expected. Do not grant public SQL access to silence it. The guest API uses the server-only credential and binds choice writes to the invitation's owner/profile pair, never a person ID supplied by the guest.
+
+Guest artwork is delivered by 20-minute signed URLs to private, owner-scoped preview files. The extra `guest-catalog.json` asset contains only catalog metadata, not licensed artwork or credentials. Guest access to imported printable files uses short-lived signed URLs for records belonging to the bound owner.
+
+Acceptance testing still needed: parent creates a link → guest opens in private browsing → guest changes favorites and picks → parent sees the changes → parent revokes → guest requests fail. Test also expiration and print behavior. Static CI alone cannot prove a real parent/guest session works.

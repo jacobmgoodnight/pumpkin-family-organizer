@@ -91,3 +91,29 @@ test("Image import clearly separates staging, permission and upload",()=>{
  assert.match(features,/Automatic import blocked/);
  assert.match(features,/if\(!check\.checked\)/);
 });
+
+test("Guest links use scoped server auth and catalog metadata only",()=>{
+ const edge=file("supabase/functions/pumpkin-profile-invites/index.ts");
+ const guest=file("guest.js");
+ const parent=file("family-invites.js");
+ const page=file("guest.html");
+ const catalog=JSON.parse(file("guest-catalog.json"));
+ assert.equal(catalog.length,2053);
+ assert.equal(new Set(catalog.map(x=>x.id)).size,2053);
+ assert.ok(catalog.every(x=>x.name&&x.thumbnail&&!x.thumbnail.startsWith("https://")));
+ assert.match(edge,/SHA-256/);
+ assert.match(edge,/is\("revoked_at",null\)/);
+ assert.match(edge,/gt\("expires_at",now\)/);
+ assert.match(edge,/eq\("person_id",personId\)/);
+ assert.match(edge,/user\.is_anonymous/);
+ assert.match(edge,/TOKEN\.test\(token\)/);
+ assert.match(guest,/sessionStorage\.setItem/);
+ assert.match(guest,/history\.replaceState/);
+ assert.match(guest,/"apikey":config\?\.publishableKey/);
+ assert.match(page,/cloud-config\.js/);
+ assert.match(parent,/navigator\.share/);
+ assert.match(parent,/action:"revoke"/);
+ assert.match(sync,/family-invites\.js/);
+ for(const path of ["guest.js","family-invites.js"])
+   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../"+path,import.meta.url).pathname]));
+});

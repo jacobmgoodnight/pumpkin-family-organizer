@@ -35,3 +35,12 @@ Run the repository's [schema-audit.sql](schema-audit.sql) in the Supabase SQL Ed
 Use a **separate test Supabase project** and first extract a real schema-only dump from the project using a supported Supabase CLI version; verify the dump includes table definitions, indexes, constraints, RLS policies and storage policies before replaying it against test. Supabase-managed `auth` and `storage` schemas require special care.
 
 This snapshot documents the live schema **but is not a complete executable SQL migration**. It does not establish the contents or version history of any production-only migrations. Never regenerate or reapply migrations on production merely to satisfy repository bookkeeping.
+
+
+## Profile invitation table (created October 29, 2026)
+
+`pc_profile_invites`: `id uuid` primary key, `owner_id uuid` FK to `pc_accounts`, `person_id text` FK as `(owner_id,person_id)` to `pc_people`, `token_hash text` unique 64-character hex, `created_at`, `expires_at`, and nullable `revoked_at` timestamps. Indexes cover owner/person/created and active expiry. Both foreign keys cascade on delete.
+
+**Verified security:** RLS enabled, **zero** client RLS policies, **zero** grants to `anon`, `authenticated` or `PUBLIC`. Access occurs only inside the scoped Supabase Edge Function with a server-held service credential. This no-policy arrangement is intentional and causes an expected INFO linter finding.
+
+Raw invitation tokens are never stored in Postgres, only SHA-256 hashes. Do not insert a client policy or public SELECT grant; do not treat the production table as a general sign-in system.

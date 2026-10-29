@@ -24,6 +24,17 @@ A private-to-the-family pumpkin-carving planner hosted on GitHub Pages. Browse *
 
 **Important:** Google Images result cards have been confirmed working by the user. Real PDF uploads, phone/tablet access, and two-device sync have **not** been acceptance-tested with the family's devices.
 
+## Secure links for each person
+
+An authenticated **parent organizer** can now open **Family account settings → Share private family links**, select 7, 14 or 30 days (default 30), and generate a separate link for any person. Use **Copy link** or the device's native **Share** sheet to deliver it privately. The app itself does **not** send emails/text messages or require children's emails.
+
+Each link opens [the restricted guest page](guest.html). The invited person can browse all 2,053 designs and authorized thumbnails, and update **only their own** favorites and final picks. They cannot open parent settings, manage others' choices, create links or access the parent password. Built-in original PDFs remain local; authorized imported printables may open with expiring signed URLs.
+
+Link security: each 256-bit random bearer token is carried in the URL **fragment**, removed from the guest address bar, held in tab-local session storage, and stored only as a SHA-256 hash on the server. Every request checks which person it belongs to and whether it was revoked or expired. Organizer may **Replace** or **Revoke** immediately. A forwarded link grants the same access to its holder, so share only with the intended person.
+
+**Verified:** the private invite table has RLS enabled, no client policies or grants; the invitation function is deployed. **Still needs a real device test:** create a link, open it in a separate browser, change picks, verify synchronization and revocation. No guest links were generated or messages sent on the user's behalf.
+
+
 ## Getting started
 
 1. Open the [website](https://jacobmgoodnight.github.io/pumpkin-family-organizer/).
