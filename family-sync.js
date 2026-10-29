@@ -9,7 +9,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  const panel=document.createElement('section');
  panel.id='cloud-family-panel';panel.setAttribute('aria-label','Family sync');
  panel.innerHTML='<div class="cloud-line"><strong>Family sync</strong><span id="cloud-status">Connecting…</span></div>'+
- '<form id="cloud-email-form" hidden style="display:none;gap:8px;max-width:420px;margin-top:10px"><label for="cloud-email">Parent email</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><label for="cloud-parent-password">Family account password</label><input id="cloud-parent-password" type="password" autocomplete="current-password" placeholder="Password set by a parent" required minlength="12"><button type="submit" id="cloud-password-login">Sign in with password</button><button type="button" id="cloud-email-link" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Use email link instead</button><p id="cloud-auth-hint" role="status" style="font-size:12px;opacity:.9;margin:0">If you first signed in by email, set a password on the device that is already signed in. No new email is needed then.</p></form>'+
+ '<form id="cloud-email-form" hidden style="display:none;gap:8px;max-width:420px;margin-top:10px"><label for="cloud-email">Parent email</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><label for="cloud-parent-password">Family account password</label><input id="cloud-parent-password" type="password" autocomplete="current-password" placeholder="Only needed for password sign-in" required><button type="submit" id="cloud-password-login">Sign in with password</button><button type="button" id="cloud-email-link" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Send email sign-in link</button><button type="button" id="cloud-reset-password" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Set up / reset password</button><p id="cloud-auth-hint" role="status" style="font-size:12px;opacity:.9;margin:0">Use the email already registered as the parent account. Email sign-in links do not require a password. New accounts cannot be created here.</p></form>'+
  '<div id="cloud-actions" hidden><button id="cloud-import" type="button">Merge favorites from this device</button><button id="cloud-set-password" type="button">Set/change parent password</button><button id="cloud-signout" type="button">Sign out</button></div>'+
  '<form id="cloud-password-setup" hidden style="display:none;gap:8px;max-width:420px;margin:10px 0"><strong>Set a parent password for other devices</strong><p style="font-size:12px;margin:0;opacity:.9">Do this once on a device where you are already signed in. Future devices can use the parent email and this password without requesting a new sign-in email.</p><label for="cloud-new-password">New password (12+ characters)</label><input id="cloud-new-password" type="password" minlength="12" autocomplete="new-password" required><label for="cloud-confirm-password">Confirm password</label><input id="cloud-confirm-password" type="password" minlength="12" autocomplete="new-password" required><div style="display:flex;gap:8px"><button type="submit">Save password</button><button id="cloud-password-cancel" type="button" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Cancel</button></div><p id="cloud-password-feedback" role="status" style="font-size:12px;margin:0"></p></form>'+ 
  '<p id="cloud-help">A parent connects each device once with their email and password. Children never need an email or password; they simply select their name. This device stays connected unless signed out.</p>';
@@ -199,28 +199,28 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(loginPending||!client)return;
    const email=$('cloud-email').value.trim();
    const password=$('cloud-parent-password').value;
-   if(password.length<12){status('Enter the parent password (12 or more characters)',true);return;}
+   if(!password){status('Enter your parent password, or use Send email sign-in link without a password.',true);return;}
    loginPending=true;$('cloud-password-login').disabled=true;status('Signing in with password…');
    try{
      const {error}=await client.auth.signInWithPassword({email,password});
      $('cloud-parent-password').value='';
      if(error){
        status('Password sign-in failed: '+error.message,true);
-       $('cloud-auth-hint').textContent='If you have never set a parent password, use an already signed-in device to set one. The email-link option is only for initial access or recovery.';
+       $('cloud-auth-hint').textContent='No password yet? Select Set up / reset password or use an already signed-in device to set one.';
      }else status('Signed in. Loading family profiles…');
    }catch(error){status('Sign-in connection error: '+error.message,true);}
    finally{loginPending=false;$('cloud-password-login').disabled=false;}
  });
  const emailCooldownKey='pumpkin_signin_email_pause_until';
- const emailLink=$('cloud-email-link');
+ const emailLink=$('cloud-email-link'),passwordReset=$('cloud-reset-password');
  function checkEmailCooldown(){
    const until=Number(localStorage.getItem(emailCooldownKey)||0);
    if(until>Date.now()){
-     emailLink.disabled=true;
+     emailLink.disabled=true;passwordReset.disabled=true;
      const mins=Math.ceil((until-Date.now())/60000);
      $('cloud-auth-hint').textContent='Email link requests are temporarily paused on this browser ('+mins+' min left). Use a password if available. The built-in Supabase email service has a project-wide 2 emails/hour limit.';
    }else{
-     emailLink.disabled=false;
+     emailLink.disabled=false;passwordReset.disabled=false;
      if(until)localStorage.removeItem(emailCooldownKey);
    }
  }
@@ -245,12 +245,39 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
        }else if(error.code==='over_request_rate_limit'||error.status===429){
          localStorage.setItem(emailCooldownKey,String(Date.now()+5*60*1000));
          status('Too many authentication requests. Use your parent password, or try again later.',true);
+       }else if(/signups? not allowed for otp|signup.*disabled|otp_disabled/i.test(error.message||'')||error.code==='otp_disabled'){
+         status('Email-link sign-in was refused. Check that the address is the existing parent account. OTP sign-in may also be restricted by Supabase.',true);
+         $('cloud-auth-hint').textContent='Try Set up / reset password with the same existing email. Keep public signups disabled.';
        }else status('Unable to send email link: '+error.message,true);
      }else{
        localStorage.setItem(emailCooldownKey,String(Date.now()+90*1000));
        status('Email link requested. Check the parent inbox and use the most recent link.');
      }
    }catch(error){status('Sign-in email connection failed: '+error.message,true);}
+   finally{emailPending=false;checkEmailCooldown();}
+ });
+ // Use Supabase recovery email for an existing parent, not public signups.
+ passwordReset.addEventListener('click',async()=>{
+   if(!client||emailPending)return;
+   checkEmailCooldown();if(passwordReset.disabled)return;
+   const field=$('cloud-email');if(!field.reportValidity())return;
+   emailPending=true;passwordReset.disabled=true;emailLink.disabled=true;
+   status('Requesting a password setup email…');
+   try{
+     const {error}=await client.auth.resetPasswordForEmail(field.value.trim(),{
+       redirectTo:location.origin+location.pathname
+     });
+     if(error){
+       if(error.code==='over_email_send_rate_limit'||error.code==='over_request_rate_limit'||error.status===429){
+         localStorage.setItem(emailCooldownKey,String(Date.now()+30*60*1000));
+         status('Email sending is temporarily limited. Use a device already signed in, or try later.',true);
+       }else status('Password setup request failed: '+error.message,true);
+     }else{
+       localStorage.setItem(emailCooldownKey,String(Date.now()+90*1000));
+       status('If the email belongs to the existing parent account, a password setup link will arrive. Open it on this device.');
+       $('cloud-auth-hint').textContent='The recovery link lets you set a password. It does not create a new family account.';
+     }
+   }catch(e){status('Could not request password setup: '+e.message,true);}
    finally{emailPending=false;checkEmailCooldown();}
  });
  // A signed-in parent can attach a password to the existing email-link account.
@@ -331,7 +358,13 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
        }catch(e){status('Cloud setup incomplete: '+e.message,true);console.error(e);ui(false);}
      }
      const {data,error}=await client.auth.getSession();if(error)throw error;
-     client.auth.onAuthStateChange((_event,session)=>setTimeout(()=>onSession(session),0));
+     client.auth.onAuthStateChange((event,session)=>setTimeout(async()=>{
+       await onSession(session);
+       if(event==='PASSWORD_RECOVERY'&&session?.user){
+         ui(true);togglePasswordSetup(true);
+         status('Password recovery confirmed. Choose a new parent password.');
+       }
+     },0));
      await onSession(data?.session);
      addEventListener('online',()=>{if(owner){void flushOutbox().then(()=>requestRefresh());}});
      addEventListener('focus',()=>{if(owner){void flushOutbox().then(()=>requestRefresh());schedulePreviews();}});
