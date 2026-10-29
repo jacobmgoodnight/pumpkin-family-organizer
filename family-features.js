@@ -189,6 +189,8 @@ export function init({getClient,getOwner,bridge}){
    }
    await Promise.all([refreshImports(),fetchIdeas()]);
  }
+ window.addEventListener("focus",()=>{if(owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
  window.addEventListener("pumpkin:cloudready",connect);
  window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
  if(owner())connect();
