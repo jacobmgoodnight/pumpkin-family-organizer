@@ -9,12 +9,38 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  const panel=document.createElement('section');
  panel.id='cloud-family-panel';panel.setAttribute('aria-label','Family sync');
  panel.innerHTML='<div class="cloud-line"><strong>Family sync</strong><span id="cloud-status">Connecting…</span></div>'+
- '<form id="cloud-email-form" hidden><label for="cloud-email">Family email</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Email address"><button type="submit">Send sign-in link</button></form>'+
+ '<form id="cloud-email-form" hidden><label for="cloud-email">Parent email (device setup only)</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><button type="submit">Connect this device</button></form>'+
  '<div id="cloud-actions" hidden><button id="cloud-import" type="button">Merge favorites from this device</button><button id="cloud-signout" type="button">Sign out</button></div>'+
- '<p id="cloud-help">Sign in with your household email and select Jacob, Shelby, Charlotte or Violet. Choices sync across signed-in devices.</p>';
+ '<p id="cloud-help">A parent connects each device once. Children never need email addresses—just tap their name. This device stays signed in unless you choose Sign out.</p>';
  document.querySelector('header')?.append(panel);
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
  const status=(s,error=false)=>{$('cloud-status').textContent=s;$('cloud-status').style.color=error?'#ffb4a8':'#a4dbc5';};
+ const parentInfo=document.createElement('div');
+ parentInfo.id='cloud-child-setup';
+ parentInfo.style.cssText='font-size:13px;line-height:1.5;padding:8px 0;color:#e4ded3';
+ parentInfo.textContent='A parent signs in once per device. Each child then chooses their name; no child email or password is needed.';
+ panel.append(parentInfo);
+ const quickPeople=document.createElement('div');
+ quickPeople.id='cloud-quick-people';quickPeople.hidden=true;
+ quickPeople.style.cssText='display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:10px 0';
+ panel.append(quickPeople);
+ function renderQuickPeople(){
+   quickPeople.replaceChildren();
+   const title=document.createElement('span');title.textContent='Who’s carving?';title.style.cssText='font-size:13px;font-weight:700;margin-right:4px';quickPeople.append(title);
+   const state=bridge.snapshot();
+   (state.people||[]).forEach((person,index)=>{
+     const b=document.createElement('button');b.type='button';b.textContent=person.name;
+     b.style.cssText='border-radius:999px;padding:8px 13px;font-weight:650;border:1px solid #647a66;background:#26352b;color:#f0ebdf';
+     if(person.id===state.active){b.style.background='#b86f36';b.style.borderColor='#f4b377';}
+     b.addEventListener('click',()=>{
+       const btn=document.querySelectorAll('#profiles button.profile')[index];
+       if(btn){btn.click();renderQuickPeople();}
+       document.querySelector('main.workspace')?.scrollIntoView({behavior:'smooth',block:'start'});
+     });
+     quickPeople.append(b);
+   });
+ }
+ window.addEventListener('pumpkin:statechange',()=>renderQuickPeople());
  const offline=clone(bridge.snapshot());
  let client=null,owner=null,channel=null,applying=false,last=null,writes=Promise.resolve(),pending=0,refreshAgain=false,refreshTimer=null,thumbnailTimer=null;
  const peopleMap=s=>new Map((s.people||[]).map(p=>[p.id,p.name]));
@@ -26,7 +52,12 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    }
    return m;
  };
- let ui=connected=>{$('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;document.body.classList.toggle('cloud-gated',!connected);};
+ let ui=connected=>{
+   $('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;
+   document.body.classList.toggle('cloud-gated',!connected);
+   quickPeople.hidden=!connected;parentInfo.hidden=connected;
+   if(connected)renderQuickPeople();
+ };
  function enqueue(before,after){
    if(!owner||!client||applying)return;
    const a=peopleMap(before),b=peopleMap(after),ca=choiceMap(before),cb=choiceMap(after);
@@ -86,7 +117,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    applying=true;
    try{bridge.applyRemote(combine(p.data||[],c.data||[]));last=clone(bridge.snapshot());}
    finally{applying=false;}
-   status('Synced ✓');schedulePreviews();
+   status('Synced ✓');renderQuickPeople();schedulePreviews();
  }
  function requestRefresh(){
    clearTimeout(refreshTimer);
@@ -179,7 +210,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      client.auth.onAuthStateChange((_event,session)=>setTimeout(()=>onSession(session),0));
      await onSession(data?.session);
      addEventListener('online',()=>{if(owner)refresh()});
-     addEventListener('focus',()=>{if(owner)refresh()});
+     addEventListener('focus',()=>{if(owner){refresh();schedulePreviews();}});
    }catch(e){status('Cloud unavailable: '+e.message,true);console.error(e);ui(false);}
  }
 
@@ -267,25 +298,74 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  // -- Private folder upload ---------------------------------------------------
  // User chooses which previews they have permission to store. No automatic
  // upload, no original PDFs, no public bucket, no service-role key.
+ const galleryState=document.createElement('div');
+ galleryState.id='cloud-gallery-state';galleryState.hidden=true;
+ galleryState.style.cssText='margin:12px 0 6px;border-radius:12px;border:1px solid #627c6a;background:rgba(32,49,39,.85);padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px';
+ const galleryMessage=document.createElement('div');galleryMessage.style.cssText='flex:1;min-width:210px;font-size:13px;line-height:1.5';
+ galleryMessage.textContent='Checking shared image availability…';
+ const galleryAction=document.createElement('button');galleryAction.type='button';
+ galleryAction.textContent='Set up thumbnails for everyone';
+ galleryAction.style.cssText='background:#edac74;color:#22170f;border:0;border-radius:9px;padding:10px;font-weight:700';
+ galleryState.append(galleryMessage,galleryAction);panel.append(galleryState);
+ const expectedImages=2053;
+ async function folderCount(folder){
+   let count=0,offset=0;
+   for(let page=0;page<10;page++){
+     const {data,error}=await client.storage.from(cfg.bucket||'pc-previews').list(owner+'/'+folder,{limit:1000,offset});
+     if(error)throw error;
+     const items=data||[];
+     count+=items.filter(x=>x.name&&/\.(jpg|jpeg|png|webp|gif)$/i.test(x.name)).length;
+     if(items.length<1000)break;
+     offset+=1000;
+   }
+   return count;
+ }
+ let countRequest=0;
+ async function updateGalleryCount(){
+   if(!client||!owner)return;
+   const sequence=++countRequest;
+   galleryMessage.textContent='Checking shared image availability…';
+   galleryState.hidden=false;
+   try{
+     const [z,a]=await Promise.all([folderCount('Thumbnails'),folderCount('Additional_Thumbnails')]);
+     if(sequence!==countRequest)return;
+     const number=z+a;
+     galleryMessage.textContent=number>=expectedImages
+       ?'✓ All '+number.toLocaleString()+' thumbnails are stored privately and available across signed-in family devices.'
+       :number
+         ?number.toLocaleString()+' of '+expectedImages.toLocaleString()+' thumbnails uploaded. Continue uploading remaining folders from your Mac or PC.'
+         :'No thumbnails have been uploaded yet. Use your Mac or PC once to upload both folders; images will then display on every connected family device.';
+     galleryAction.textContent=number>=expectedImages?'Manage private thumbnails':'Upload thumbnails for everyone';
+     if(number<expectedImages)galleryState.style.borderColor='#c99a57';
+     else galleryState.style.borderColor='#5b9368';
+   }catch(e){galleryMessage.textContent='Could not check thumbnails: '+(e.message||'network error')+'. You can still try uploading.';}
+ }
  const uploadDetails=document.createElement('details');
  uploadDetails.hidden=true;uploadDetails.style.cssText='margin-top:12px;padding:10px;border:1px solid #466158;border-radius:10px';
  const uploadSummary=document.createElement('summary');
- uploadSummary.textContent='📷 Add private thumbnail folders';uploadSummary.style.cursor='pointer';
+ uploadSummary.textContent='📷 Upload photos for all family devices';uploadSummary.style.cursor='pointer';
  const uploadDesc=document.createElement('p');
- uploadDesc.textContent='From your computer, select the “Thumbnails” folder, then repeat with “Additional_Thumbnails”. Only images are uploaded to private family storage; no printable PDFs. Your browser may take several minutes to upload the full collection.';
+ uploadDesc.textContent='One-time setup on the Mac or PC that holds your organizer: choose the Thumbnails folder first, then repeat with Additional_Thumbnails. About 2,053 small preview images (~195 MB total) are stored privately for your signed-in household. No PDFs are uploaded. Keep this browser tab open during upload.';
  const rights=document.createElement('label');
  rights.style.cssText='display:block;margin:8px 0;font-size:13px';
  const rightsCheck=document.createElement('input');rightsCheck.type='checkbox';
  rights.append(rightsCheck,document.createTextNode(' I confirm that I have permission to store these selected previews privately for household use.'));
  const folderButton=document.createElement('button');
- folderButton.type='button';folderButton.textContent='Choose a thumbnail folder';folderButton.style.cssText='background:#f0ae70;color:#141c18;border:0;padding:10px;border-radius:8px;font-weight:700';
+ folderButton.type='button';folderButton.textContent='Choose Thumbnails or Additional_Thumbnails folder';folderButton.style.cssText='background:#f0ae70;color:#141c18;border:0;padding:10px;border-radius:8px;font-weight:700';
  const folderInput=document.createElement('input');
  folderInput.type='file';folderInput.multiple=true;folderInput.hidden=true;folderInput.setAttribute('webkitdirectory','');folderInput.setAttribute('directory','');
  const uploadProgress=document.createElement('p');uploadProgress.setAttribute('aria-live','polite');
  uploadDetails.append(uploadSummary,uploadDesc,rights,folderButton,folderInput,uploadProgress);
  panel.append(uploadDetails);
  const oldUi=ui;
- ui=connected=>{oldUi(connected);uploadDetails.hidden=!connected;};
+ ui=connected=>{
+   oldUi(connected);uploadDetails.hidden=!connected;galleryState.hidden=!connected;
+   if(connected){updateGalleryCount();}else{countRequest++;}
+ };
+ galleryAction.addEventListener('click',()=>{
+   uploadDetails.open=true;
+   uploadDetails.scrollIntoView({behavior:'smooth',block:'center'});
+ });
  folderButton.addEventListener('click',()=>{
    if(!owner){uploadProgress.textContent='Sign in before uploading.';return;}
    if(!rightsCheck.checked){uploadProgress.textContent='First confirm that you have permission to store these previews.';return;}
@@ -323,8 +403,12 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      }
    }
    await Promise.all(Array.from({length:Math.min(4,allowed.length)},worker));
-   busyUpload=false;folderButton.disabled=false;urls.clear();schedulePreviews();
-   uploadProgress.textContent='Finished: '+(complete-failed)+' uploaded / '+complete+' attempted'+(failed?'; '+failed+' errors. '+examples.join(' | '):'. Refresh the gallery to see your images.');
+   busyUpload=false;folderButton.disabled=false;
+   urls.clear();
+   document.querySelectorAll('img[data-pumpkin-path]').forEach(img=>{img.dataset.pumpkinSigned='';});
+   schedulePreviews();updateGalleryCount();
+   uploadProgress.textContent='Finished: '+(complete-failed)+' uploaded / '+complete+' attempted'+(failed?'; '+failed+' errors. '+examples.join(' | '):'. Refresh the gallery if needed to see your images on all signed-in devices.');
+   if(!failed)uploadDetails.open=false;
  });
  start();
 }
