@@ -56,3 +56,72 @@ body.family-connected #cloud-account-settings:not([open])>summary{font-size:12px
  body.family-connected .headline p{display:none}
  #family-profile-invites button{max-width:100%;overflow-wrap:anywhere}
 }
+
+/* Search-first home experience — foreground search, keep the other controls discoverable. */
+.search-hero{background:linear-gradient(118deg,#244031,#182a20);border:1px solid #63846c;border-radius:16px;padding:clamp(14px,2vw,22px);margin-bottom:12px;display:grid;gap:10px;min-width:0}
+.search-hero-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.search-hero-head h2{margin:2px 0 0;font-size:clamp(20px,2.1vw,27px);line-height:1.2;color:#fff6e9}
+.search-hero-eyebrow{color:#efb680;font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:750}
+.search-hero-search .control{gap:6px}.search-hero-search .control>label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.search-hero-search input{width:100%;padding:14px 16px;min-height:56px;font-size:17px;border:2px solid #789d7d;background:#0b1b14;color:#fff;border-radius:12px}
+.search-hero-search input::placeholder{color:#b0c5b6}.search-hero-search .search-help{display:none}
+.search-hero-footer{display:flex;gap:12px;align-items:center;justify-content:space-between}
+.search-hero-footer button{min-height:42px}.search-hero-hint{font-size:12px;color:#c6d8c8}
+.carver-hint{font-size:12px;margin:2px 0 0;color:#b9cbbd}
+.profile-panel{padding:12px 16px}.profile-panel .profiles{margin-top:8px}
+.utility-row{padding:10px 0 8px}.utility-row .headline h2{font-size:15px}.utility-row .headline p{display:none}
+.view-tabs{margin-bottom:10px}
+.advanced-filters{margin:8px 0 10px;border:1px solid #485d4e;border-radius:12px;background:#1a2921}
+.advanced-filters>summary{font-weight:650;color:#e7ceb0;cursor:pointer;padding:12px 14px;min-height:45px;list-style:none;display:flex;align-items:center}
+.advanced-filters>summary::-webkit-details-marker{display:none}
+.advanced-filters[open]>summary{border-bottom:1px solid #435b4b}
+.advanced-filters .filters{border:0;background:transparent;border-radius:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:12px}
+.advanced-filters:not([open]) .filters{display:none!important}
+#cloud-family-panel #organizer-identity{display:inline-block;font-size:12px;opacity:.85;max-width:min(36vw,260px);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+#cloud-family-panel #organizer-links{font-size:12px;border:1px solid #668675;border-radius:8px;padding:6px 10px;background:#284638;color:#f5f0e7;min-height:38px}
+#cloud-family-panel .cloud-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#cloud-family-panel #organizer-links[hidden],#cloud-family-panel #organizer-identity[hidden]{display:none!important}
+@media screen and (max-width:700px){
+ body.family-connected .top{padding:7px 0 8px}
+ body.family-connected .top .eyebrow{display:none}
+ body.family-connected .top h1{font-size:20px;letter-spacing:-.03em;margin:0 0 5px}
+ body.family-connected #cloud-family-panel{padding:6px 10px;margin:5px auto 3px}
+ body.family-connected #cloud-family-panel .cloud-line{gap:6px}
+ body.family-connected #cloud-family-panel .cloud-line strong{font-size:12px}
+ body.family-connected #cloud-family-panel #cloud-status{font-size:11px}
+ body.family-connected #cloud-family-panel #organizer-identity{font-size:11px;max-width:43vw}
+ body.family-connected #cloud-family-panel #organizer-links{margin-left:auto;padding:5px 9px;min-height:36px}
+ body.family-connected .workspace{padding-top:9px}
+ .search-hero{border-radius:13px;padding:12px;margin-bottom:9px;gap:8px}
+ .search-hero-head h2{font-size:20px}
+ .search-hero-eyebrow{font-size:10px}
+ .search-hero-search input{min-height:52px;font-size:16px;padding:11px 13px}
+ .search-hero-head .settings-launch{font-size:12px;min-width:0;white-space:nowrap}
+ .search-hero-footer{gap:8px}
+ .search-hero-hint{font-size:10px;text-align:right;line-height:1.3}
+ .profile-panel{padding:10px 12px}
+ .profile-panel .panel-top h2{font-size:14px}
+ .profile-panel .panel-top #manage{font-size:11px;padding:5px 8px}
+ .profile-panel .profiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+ .profile-panel .profile{min-width:0;padding:8px 3px;font-size:12px;min-height:44px;overflow-wrap:anywhere}
+ .profile-panel .profile .number{display:none}
+ .profile-panel .carver-hint{font-size:10px}
+ .utility-row{padding:7px 0 6px}
+ .utility-row .headline h2{font-size:14px}
+ .view-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:5px}
+ .view-tabs .tab{min-width:0;min-height:42px;font-size:12px;padding:8px 4px;white-space:normal}
+ .advanced-filters .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .advanced-filters .filters>.control:first-child{grid-column:auto}
+ .advanced-filters .filters>.control:not(:first-child)>label{min-height:0;align-items:initial}
+ .advanced-filters .filters .control select{font-size:16px;min-height:44px}
+ .advanced-filters #difficulty-control:not([hidden]){grid-column:1/-1}
+ .toolbar-tail{margin-top:8px}
+}
+@media screen and (max-width:375px){
+ .profile-panel .profiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .search-hero-hint{display:none}
+ .search-hero-head .settings-launch{font-size:11px}
+}
+@media print{
+ .search-hero,.advanced-filters,.view-tabs{display:none!important}
+}

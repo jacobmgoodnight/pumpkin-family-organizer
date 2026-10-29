@@ -117,3 +117,27 @@ test("Guest links use scoped server auth and catalog metadata only",()=>{
  for(const path of ["guest.js","family-invites.js"])
    assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../"+path,import.meta.url).pathname]));
 });
+
+test("Search-first layout has one real input and preserves core handlers",()=>{
+ const css=file("mobile-polish.css"),searchFirst=file("search-first.js");
+ assert.equal((html.match(/id="search"/g)||[]).length,1);
+ assert.equal((html.match(/id="settings-open"/g)||[]).length,1);
+ assert.ok(html.indexOf('id="search-first"')<html.indexOf('class="profile-panel"'));
+ assert.ok(html.indexOf('id="search-first"')<html.indexOf('id="tabs"'));
+ assert.ok(html.includes('id="advanced-filters"'));
+ assert.match(html,/src="search-first\.js"/);
+ assert.match(html,/getElementById\('search-first'\)/);
+ assert.match(searchFirst,/details\.open=!details\.open/);
+ assert.match(searchFirst,/aria-expanded/);
+ assert.match(css,/\.search-hero-search input\{/);
+ assert.match(css,/\.profile-panel \.profiles\{display:grid;grid-template-columns:repeat\(4/);
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../search-first.js",import.meta.url).pathname]));
+});
+test("Organizer identity is separate from selected family profile",()=>{
+ assert.match(sync,/id="organizer-identity"/);
+ assert.match(sync,/id="organizer-links"/);
+ assert.match(sync,/session\.user\.email/);
+ assert.match(sync,/family-profile-invites/);
+ assert.match(sync,/Organizer/);
+ assert.match(sync,/parent account|Parent account/i);
+});

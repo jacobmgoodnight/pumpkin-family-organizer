@@ -8,7 +8,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
 }else{
  const panel=document.createElement('section');
  panel.id='cloud-family-panel';panel.setAttribute('aria-label','Family sync');
- panel.innerHTML='<div class="cloud-line"><strong>Family sync</strong><span id="cloud-status">Connecting…</span></div>'+
+ panel.innerHTML='<div class="cloud-line"><strong id="organizer-label">Family sign-in</strong><span id="cloud-status">Connecting…</span><span id="organizer-identity" hidden></span><button type="button" id="organizer-links" hidden>🔗 Share links</button></div>'+
  '<form id="cloud-email-form" hidden style="display:none;gap:8px;max-width:420px;margin-top:10px"><label for="cloud-email">Parent email</label><input id="cloud-email" type="email" autocomplete="email" required placeholder="Parent email"><label for="cloud-parent-password">Family account password</label><input id="cloud-parent-password" type="password" autocomplete="current-password" placeholder="Only needed for password sign-in" required><button type="submit" id="cloud-password-login">Sign in with password</button><button type="button" id="cloud-email-link" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Send email sign-in link</button><button type="button" id="cloud-reset-password" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Set up / reset password</button><p id="cloud-auth-hint" role="status" style="font-size:12px;opacity:.9;margin:0">Use the email already registered as the parent account. Email sign-in links do not require a password. New accounts cannot be created here.</p></form>'+
  '<div id="cloud-actions" hidden><button id="cloud-import" type="button">Merge favorites from this device</button><button id="cloud-set-password" type="button">Set/change parent password</button><button id="cloud-signout" type="button">Sign out</button></div>'+
  '<form id="cloud-password-setup" hidden style="display:none;gap:8px;max-width:420px;margin:10px 0"><strong>Set a parent password for other devices</strong><p style="font-size:12px;margin:0;opacity:.9">Do this once on a device where you are already signed in. Future devices can use the parent email and this password without requesting a new sign-in email.</p><label for="cloud-new-password">New password (12+ characters)</label><input id="cloud-new-password" type="password" minlength="12" autocomplete="new-password" required><label for="cloud-confirm-password">Confirm password</label><input id="cloud-confirm-password" type="password" minlength="12" autocomplete="new-password" required><div style="display:flex;gap:8px"><button type="submit">Save password</button><button id="cloud-password-cancel" type="button" style="background:transparent;border:1px solid #697c6c;color:#e8e7dc">Cancel</button></div><p id="cloud-password-feedback" role="status" style="font-size:12px;margin:0"></p></form>'+ 
@@ -16,6 +16,12 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  document.querySelector('header')?.append(panel);
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
  const status=(s,error=false)=>{$('cloud-status').textContent=s;$('cloud-status').style.color=error?'#ffb4a8':'#a4dbc5';};
+ // The organizer is the authenticated adult account, never the selected carver.
+ $('organizer-links').addEventListener('click',()=>{
+   accountSettings.open=true;
+   const invitations=document.getElementById('family-profile-invites');
+   if(invitations){invitations.open=true;invitations.scrollIntoView({behavior:'smooth',block:'nearest'});}
+ });
  const accountSettings=document.createElement('details');
  accountSettings.id='cloud-account-settings';accountSettings.hidden=true;
  accountSettings.style.cssText='margin-top:7px;border-top:1px solid #53665c;padding:9px 0';
@@ -89,6 +95,10 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    return m;
  };
  let ui=connected=>{
+   $('organizer-label').textContent=connected?'Organizer':'Family sign-in';
+   $('organizer-links').hidden=!connected;
+   $('organizer-identity').hidden=!connected;
+   if(!connected)$('organizer-identity').textContent='';
    $('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;
    // Forms use CSS grid; explicitly hide when HTML 'hidden' competes with display.
    $('cloud-email-form').style.display=connected?'none':'grid';
@@ -348,7 +358,9 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
        if(!session?.user){owner=null;outbox=[];last=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
        urls.clear();urlsUntil=0;
-       owner=session.user.id;last=clone(bridge.snapshot());outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
+       owner=session.user.id;
+       $('organizer-identity').textContent=session.user.email||'Parent account';
+       last=clone(bridge.snapshot());outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
        try{
          await seed();if(outbox.length)await flushOutbox();await refresh();ui(true);
          if(!previewObserver){previewObserver=new MutationObserver(schedulePreviews);previewObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});}

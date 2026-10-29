@@ -132,3 +132,12 @@ The repository now includes dependency-free Node.js smoke tests in `tests/` and 
 - **Web-image import:** A successful CORS-permitted original-image fetch is explicitly marked **staged**, not uploaded. If the remote host blocks it, the dialog explains that nothing was imported and provides a **Choose file from phone or computer** button. Search preview images are not substituted as printable originals.
 
 These improvements have syntax/static checks in GitHub Actions; the exact iPhone layout, password recovery email delivery and different external hosts still require live acceptance testing.
+
+
+## Search-first layout (October 29, 2026)
+
+The organizer home screen now starts with **one prominent search box**, immediately followed by the **four family profile choices** and simple **Browse all / Favorites / Final picks / Family lineup** navigation. Collection, theme, and difficulty filters live inside a **More filters** disclosure; the existing original selectors, search suggestions, favorites and gallery logic remain unchanged. The sticky quick-search bar appears after the top search scrolls out of view and its Filters action opens the advanced controls. Mobile filter and search controls are designed for touch targets rather than stacked full-screen panels.
+
+The header distinguishes the **Organizer** (authenticated adult's Supabase account/email) from the **selected carver** (whose favorites are active). A **Share links** shortcut expands Family account settings → Share private family links, where an organizer can **Replace link** if an invitation is lost or already shared. Replacing a link revokes the previous one, because plaintext invite secrets are deliberately never stored in the database. The authenticated parent account, not the Jacob/Shelby/Charlotte/Violet selector, determines organizer privileges.
+
+This redesign changes markup and styling, **not the 2,053 catalog records, user profiles, RLS policies, or database**. Automated DOM/source regression tests cover the unique search input, progressive filters, link management and JavaScript syntax. Actual phone Safari layout and signed-in parent use still need human acceptance testing.

@@ -54,3 +54,9 @@ Parent: Sign in, expand **Family account settings → Share private family links
 Recipient: Tap your personal link. You will see your own favorite and final-pick controls. You cannot change another person's picks or see the parent's settings. The link works until it expires or the parent revokes it.
 
 Privacy: Anyone who receives the link can act as that person, so do not post it publicly. Parent can revoke it or generate a replacement; old links stop working.
+
+## Faster home-screen navigation
+
+The main search is now the first control on the page, with family profiles immediately beneath it. Type a few letters to see suggestions; choose your name so favorites and final picks go to your profile. The **More filters** button reveals collection, theme and difficulty filters when needed; tapping it again hides them. Use the four tabs to browse all, favorites, final picks or the family lineup.
+
+**Who is the organizer?** It's whoever is signed into the existing adult Supabase parent account—the email displayed beside **Organizer** at the top. Choosing Jacob, Shelby, Charlotte or Violet does **not** make that person an administrator. The **Share links** shortcut opens the invite manager. If a person loses their link or you want a new one, tap **Replace link** for that person and copy/share the newly generated URL. The old link is immediately invalidated.
