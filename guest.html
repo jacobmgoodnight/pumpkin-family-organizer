@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
+<title>My Pumpkin Picks · Goodnight Family</title><link rel="icon" href="app-icon.svg">
+<link rel="stylesheet" href="guest.css"></head>
+<body>
+<header><div class="container head">
+  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Your pumpkin designs</h1><p id="subtitle">Opening your private invitation…</p></div>
+  <a href="./" class="quiet">Family homepage</a>
+</div></header>
+<main class="container">
+ <div id="alert" role="status" aria-live="polite"></div>
+ <section id="guest-app" hidden>
+  <div class="toolbar">
+   <label class="search"><span>Search designs</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off"></label>
+   <label class="filter"><span>Show</span><select id="filter"><option value="all">All designs</option><option value="zombie">Curated Zombie Pumpkins</option><option value="favorite">My favorites</option><option value="picked">My final picks</option><option value="family">Family imports</option></select></label>
+  </div>
+  <div class="summary"><span id="count"></span><span id="totals"></span></div>
+  <div id="grid" class="cards"></div>
+  <button id="more" class="more" hidden>Show more designs</button>
+  <p class="note">Only your favorites and final picks are changed with this link. Built-in printable PDFs remain on the organizer's computer; family-imported printable files may open here if available.</p>
+  <button id="forget" class="quiet danger">Forget invitation on this device</button>
+ </section>
+</main><script type="module" src="guest.js"></script>
+</body></html>
