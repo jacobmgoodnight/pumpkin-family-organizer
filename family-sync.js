@@ -26,7 +26,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    }
    return m;
  };
- const ui=connected=>{$('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;document.body.classList.toggle('cloud-gated',!connected);};
+ let ui=connected=>{$('cloud-email-form').hidden=connected;$('cloud-actions').hidden=!connected;document.body.classList.toggle('cloud-gated',!connected);};
  function enqueue(before,after){
    if(!owner||!client||applying)return;
    const a=peopleMap(before),b=peopleMap(after),ca=choiceMap(before),cb=choiceMap(after);
@@ -182,13 +182,149 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
      addEventListener('focus',()=>{if(owner)refresh()});
    }catch(e){status('Cloud unavailable: '+e.message,true);console.error(e);ui(false);}
  }
- // Web cannot resolve local Windows PDF paths. Never expose licensed originals.
+
+ // -- Original PDF locator ----------------------------------------------------
+ // The catalog's source paths refer to actual Zombie Pumpkins folders;
+ // the pretty in-organizer category paths are NOT those originals.
+ const libraryRootKey='pumpkin_local_library_root';
+ let currentPrintItem=null;
+ const printDialog=document.createElement('dialog');
+ printDialog.id='pumpkin-original-locator';
+ printDialog.style.cssText='width:min(92vw,680px);border:1px solid #a7784c;border-radius:16px;background:#16201c;color:#f9f2e6;padding:22px;box-shadow:0 20px 70px #000b';
+ const closePrint=document.createElement('button');
+ closePrint.textContent='Close';closePrint.type='button';closePrint.style.cssText='padding:9px 16px;border-radius:9px;background:#38463d;color:white;border:1px solid #768578';
+ const copyPrint=document.createElement('button');
+ copyPrint.textContent='Copy file path';copyPrint.type='button';copyPrint.style.cssText='padding:9px 16px;border-radius:9px;background:#f0ae70;color:#1d1c15;border:0;margin-right:8px;font-weight:700';
+ const setRoot=document.createElement('button');
+ setRoot.textContent='Set my local library folder';setRoot.type='button';setRoot.style.cssText='display:block;margin:9px 0;background:none;border:0;padding:0;color:#bda8dc;cursor:pointer;text-decoration:underline';
+ const printTitle=document.createElement('h3');
+ const printHelp=document.createElement('p');
+ printHelp.textContent='On your Mac, in Finder choose Go → Go to Folder (Shift + Command + G), then paste the copied path. On Windows, paste it in File Explorer. Web browsers cannot directly open local-drive PDFs.';
+ const printPath=document.createElement('div');
+ printPath.style.cssText='overflow-wrap:anywhere;font:13px/1.5 ui-monospace,Consolas,monospace;background:#0a100e;border:1px solid #374b41;border-radius:8px;padding:12px;margin:12px 0';
+ const printHint=document.createElement('p');
+ printHint.style.cssText='font-size:13px;opacity:.75';
+ const printControls=document.createElement('div');
+ printControls.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+ printControls.append(copyPrint,closePrint);
+ printDialog.append(printTitle,printHelp,printPath,printHint,setRoot,printControls);
+ document.body.append(printDialog);
+ function trueRelativePath(item){
+   const source=Array.isArray(item?.sources)
+     ?item.sources.find(s=>typeof s==='string'&&s.startsWith('Zombie Pumpkins/')&&/\.pdf$/i.test(s)):null;
+   return source||(item?.path?'____Pumpkin_Complete_Family_Organizer_HD/'+item.path:'');
+ }
+ function printPathFor(item){
+   const rel=trueRelativePath(item);
+   const root=(localStorage.getItem(libraryRootKey)||'').trim().replace(/[/\\]+$/,'');
+   if(!root)return rel;
+   const sep=root.includes('\\')?'\\':'/';
+   return root+sep+rel.split('/').join(sep);
+ }
+ function drawPath(){
+   if(!currentPrintItem)return;
+   printPath.textContent=printPathFor(currentPrintItem);
+   printHint.textContent=localStorage.getItem(libraryRootKey)
+     ?'This original file must be on your own computer or connected drive.'
+     :'For a complete absolute path, set the folder containing “Zombie Pumpkins” and “____Pumpkin_Complete_Family_Organizer_HD”. This setting stays on this device.';
+ }
+ setRoot.addEventListener('click',()=>{
+   const previous=localStorage.getItem(libraryRootKey)||'';
+   const entered=prompt('Paste the folder path CONTAINING both Zombie Pumpkins and ____Pumpkin_Complete_Family_Organizer_HD:',previous||'/Volumes/SSD2go PKT/Holiday videos/Pumpkin Cutout Templates');
+   if(entered===null)return;
+   if(entered.trim())localStorage.setItem(libraryRootKey,entered.trim());
+   else localStorage.removeItem(libraryRootKey);
+   drawPath();
+ });
+ copyPrint.addEventListener('click',async()=>{
+   try{await navigator.clipboard.writeText(printPathFor(currentPrintItem));copyPrint.textContent='Copied ✓';setTimeout(()=>{copyPrint.textContent='Copy file path'},1800)}
+   catch{prompt('Copy the original file path:',printPathFor(currentPrintItem))}
+ });
+ closePrint.addEventListener('click',()=>printDialog.close());
+ printDialog.addEventListener('click',e=>{if(e.target===printDialog)printDialog.close()});
  document.addEventListener('click',event=>{
    const link=event.target.closest('a[href]');
-   if(link && /^(Templates|Additional_Templates)\//i.test(decodeURIComponent(link.getAttribute('href')||''))){
-     event.preventDefault();
-     alert('Original printable files remain in your local organizer. Web printing will be enabled after PDF path and permissions review.');
-   }
+   if(!link||!(link.classList.contains('pdf')||link.id==='preview-original'))return;
+   const href=decodeURIComponent(link.getAttribute('href')||'');
+   if(!/^(Templates|Additional_Templates)\//i.test(href))return;
+   event.preventDefault();
+   currentPrintItem=window.allData?.().find(x=>x.path===href);
+   if(!currentPrintItem)return;
+   printTitle.textContent='Find the original: '+currentPrintItem.name;
+   drawPath();
+   printDialog.showModal();
  },true);
+ function updateOriginalLabels(){
+   document.querySelectorAll('a.pdf').forEach(a=>{if(a.textContent!=='Find original ↗')a.textContent='Find original ↗'});
+   const preview=document.getElementById('preview-original');
+   if(preview&&preview.textContent.startsWith('Open original'))preview.textContent='Find original file ↗';
+   if(preview&&preview.textContent.startsWith('Open PDF'))preview.textContent='Find original PDF ↗';
+ }
+ const labelsObserver=new MutationObserver(()=>updateOriginalLabels());
+ labelsObserver.observe(document.body,{subtree:true,childList:true});
+ updateOriginalLabels();
+
+ // -- Private folder upload ---------------------------------------------------
+ // User chooses which previews they have permission to store. No automatic
+ // upload, no original PDFs, no public bucket, no service-role key.
+ const uploadDetails=document.createElement('details');
+ uploadDetails.hidden=true;uploadDetails.style.cssText='margin-top:12px;padding:10px;border:1px solid #466158;border-radius:10px';
+ const uploadSummary=document.createElement('summary');
+ uploadSummary.textContent='📷 Add private thumbnail folders';uploadSummary.style.cursor='pointer';
+ const uploadDesc=document.createElement('p');
+ uploadDesc.textContent='From your computer, select the “Thumbnails” folder, then repeat with “Additional_Thumbnails”. Only images are uploaded to private family storage; no printable PDFs. Your browser may take several minutes to upload the full collection.';
+ const rights=document.createElement('label');
+ rights.style.cssText='display:block;margin:8px 0;font-size:13px';
+ const rightsCheck=document.createElement('input');rightsCheck.type='checkbox';
+ rights.append(rightsCheck,document.createTextNode(' I confirm that I have permission to store these selected previews privately for household use.'));
+ const folderButton=document.createElement('button');
+ folderButton.type='button';folderButton.textContent='Choose a thumbnail folder';folderButton.style.cssText='background:#f0ae70;color:#141c18;border:0;padding:10px;border-radius:8px;font-weight:700';
+ const folderInput=document.createElement('input');
+ folderInput.type='file';folderInput.multiple=true;folderInput.hidden=true;folderInput.setAttribute('webkitdirectory','');folderInput.setAttribute('directory','');
+ const uploadProgress=document.createElement('p');uploadProgress.setAttribute('aria-live','polite');
+ uploadDetails.append(uploadSummary,uploadDesc,rights,folderButton,folderInput,uploadProgress);
+ panel.append(uploadDetails);
+ const oldUi=ui;
+ ui=connected=>{oldUi(connected);uploadDetails.hidden=!connected;};
+ folderButton.addEventListener('click',()=>{
+   if(!owner){uploadProgress.textContent='Sign in before uploading.';return;}
+   if(!rightsCheck.checked){uploadProgress.textContent='First confirm that you have permission to store these previews.';return;}
+   folderInput.value='';folderInput.click();
+ });
+ let busyUpload=false;
+ folderInput.addEventListener('change',async()=>{
+   if(busyUpload||!owner||!rightsCheck.checked)return;
+   const ownerForUpload=owner;
+   const selected=[...folderInput.files];
+   const allowed=[];
+   for(const file of selected){
+     const relative=(file.webkitRelativePath||'').replaceAll('\\','/');
+     if(!/^(Thumbnails|Additional_Thumbnails)\/[a-z0-9._-]+\.(jpg|jpeg|png|webp|gif)$/i.test(relative))continue;
+     if(file.size>20*1024*1024)continue;
+     allowed.push({file,path:relative});
+   }
+   if(!allowed.length){uploadProgress.textContent='Choose the Thumbnails or Additional_Thumbnails folder itself, not the organizer parent.';return;}
+   const totalBytes=allowed.reduce((n,x)=>n+x.file.size,0);
+   if(!confirm('Privately upload '+allowed.length+' selected thumbnails ('+(totalBytes/1048576).toFixed(1)+' MB) to your signed-in household account? No PDFs or public images will be published.'))return;
+   busyUpload=true;folderButton.disabled=true;
+   let next=0,complete=0,failed=0;const examples=[];
+   const mime={'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','webp':'image/webp','gif':'image/gif'};
+   async function worker(){
+     while(next<allowed.length&&owner===ownerForUpload){
+       const j=next++,entry=allowed[j],ext=entry.path.split('.').pop().toLowerCase();
+       try{
+         const {error}=await client.storage.from(cfg.bucket||'pc-previews').upload(ownerForUpload+'/'+entry.path,entry.file,{
+           cacheControl:'3600',upsert:true,contentType:mime[ext]
+         });
+         if(error)throw error;
+       }catch(e){failed++;if(examples.length<4)examples.push(entry.path+': '+e.message);}
+       complete++;
+       if(complete%10===0||complete===allowed.length)uploadProgress.textContent='Private uploads: '+complete+'/'+allowed.length+(failed?' · '+failed+' failed':'');
+     }
+   }
+   await Promise.all(Array.from({length:Math.min(4,allowed.length)},worker));
+   busyUpload=false;folderButton.disabled=false;urls.clear();schedulePreviews();
+   uploadProgress.textContent='Finished: '+(complete-failed)+' uploaded / '+complete+' attempted'+(failed?'; '+failed+' errors. '+examples.join(' | '):'. Refresh the gallery to see your images.');
+ });
  start();
 }
