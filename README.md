@@ -12,7 +12,7 @@ A private-to-the-family pumpkin-carving planner hosted on GitHub Pages. Browse *
 | Smart Search | Names, tags, keywords and 1,553 reviewed visual descriptions; curated results favored on close matches, not above clearly stronger matches |
 | Family profiles | Jacob, Shelby, Charlotte and Violet share one trusted adult Supabase login; kids do not need email |
 | Favorites & Final Picks | Person-specific selections stored in Supabase; Realtime listeners refresh connected devices |
-| Private thumbnails | **All 2,053 uploaded and verified in the private \`pc-previews\` bucket** (661 + 1,392; about 194 MiB) |
+| Private thumbnails | **All 2,053 uploaded and verified in the private `pc-previews` bucket** (661 + 1,392; about 194 MiB) |
 | Family imports | Upload an authorized PDF or image to private storage with title, tags, category and optional preview; shown in the regular gallery, favorites and Final Picks |
 | Saved web ideas | Save source links and externally hosted preview references separately from actual printable imports |
 | Google Images discovery | Native-styled external-result cards through the deployed SerpApi Edge Function **once a private API key is configured** |
@@ -36,7 +36,7 @@ Supabase persists browser sessions, but sessions can expire or be cleared. An em
 
 The account's private Supabase Storage already contains all 2,053 original preview images. **There is no need to upload them again.** If a future device reports missing previews, confirm it is signed into the same account, then refresh the page. A troubleshooting uploader is available in **Family account settings → Upload photos for all family devices**, but it should only be used for an actual missing/failed upload. Original licensed PDFs are not hosted publicly.
 
-Family imports use the separate private \`pc-family-imports\` bucket. A printable PDF/image is required; an optional JPG, PNG or WebP thumbnail improves the gallery preview. Without a separate image thumbnail, imported PDFs use a pumpkin placeholder, not an automatically generated PDF preview. Supported uploads are limited to **20 MB per file**. Source attribution is optional, and duplicate titles produce a confirmation rather than automatic merging.
+Family imports use the separate private `pc-family-imports` bucket. A printable PDF/image is required; an optional JPG, PNG or WebP thumbnail improves the gallery preview. Without a separate image thumbnail, imported PDFs use a pumpkin placeholder, not an automatically generated PDF preview. Supported uploads are limited to **20 MB per file**. Source attribution is optional, and duplicate titles produce a confirmation rather than automatic merging.
 
 ## Google Images inside the app
 
@@ -49,10 +49,10 @@ Once enabled, the in-app results include an externally hosted thumbnail, title, 
 1. Sign up for a free account at [SerpApi](https://serpapi.com/users/sign_up).
 2. Copy the key from [Manage API Key](https://serpapi.com/manage-api-key).
 3. Open [this app's Supabase dashboard](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn) → **Edge Functions → Secrets**.
-4. Add a secret whose **name** is exactly \`SERPAPI_KEY\`; paste the key as its **value**. **Never place it in browser code, the public repo, issues, or chat.**
+4. Add a secret whose **name** is exactly `SERPAPI_KEY`; paste the key as its **value**. **Never place it in browser code, the public repo, issues, or chat.**
 5. Save the secret, reload the [family organizer](https://jacobmgoodnight.github.io/pumpkin-family-organizer/), search a subject such as "Hello Kitty", and click **Find more online → Search Google Images**.
 
-The deployed \`pumpkin-image-search\` Edge Function uses Google Images via SerpApi, checks the authenticated user's family account, and returns **up to 12 cards per query**. It currently limits the household to **15 image searches per rolling hour and 40 per rolling day**. Provider quotas are independent. As of October 29, 2026, SerpApi advertises **250 free searches per month**; verify current plan terms at [SerpApi pricing](https://serpapi.com/). The app checks whether the server secret exists when you open web discovery, but a configured secret alone does not prove a successful provider search.
+The deployed `pumpkin-image-search` Edge Function uses Google Images via SerpApi, checks the authenticated user's family account, and returns **up to 12 cards per query**. It currently limits the household to **15 image searches per rolling hour and 40 per rolling day**. Provider quotas are independent. As of October 29, 2026, SerpApi advertises **250 free searches per month**; verify current plan terms at [SerpApi pricing](https://serpapi.com/). The app checks whether the server secret exists when you open web discovery, but a configured secret alone does not prove a successful provider search.
 
 If the key is not configured, **Open Google Images** still launches the normal Google Images results in another tab, with no key. There is **no browser-only method for embedding arbitrary Google Images search results as reliable custom cards without an approved search provider**.
 
@@ -65,26 +65,26 @@ If the key is not configured, **Open Google Images** still launches the normal G
 
 ## How printing works
 
-**Built-in patterns:** The site keeps original relative source paths and provides **Find original**. On a computer that has the purchased/licensed catalog, use the locator's **Set my local library folder** action, then copy the file path into Finder or Windows File Explorer. The root is the folder containing both \`Zombie Pumpkins\` and \`____Pumpkin_Complete_Family_Organizer_HD\`. Browsers on other devices cannot read files on that computer directly.
+**Built-in patterns:** The site keeps original relative source paths and provides **Find original**. On a computer that has the purchased/licensed catalog, use the locator's **Set my local library folder** action, then copy the file path into Finder or Windows File Explorer. The root is the folder containing both `Zombie Pumpkins` and `____Pumpkin_Complete_Family_Organizer_HD`. Browsers on other devices cannot read files on that computer directly.
 
 **Family imports:** An authorized imported PDF or image gets a short-lived signed URL to the private original file, letting the browser open it for printing. Imported originals are not published to GitHub. A separate image preview is recommended for PDF imports.
 
-The locally repaired \`START_HERE.html\` and any repair ZIPs distributed outside this repository are **not included in the GitHub Pages deployment**. This README does not claim they have been installed or audited on every device.
+The locally repaired `START_HERE.html` and any repair ZIPs distributed outside this repository are **not included in the GitHub Pages deployment**. This README does not claim they have been installed or audited on every device.
 
 ## Security and architecture
 
-- **Frontend:** Static \`index.html\`, \`family-sync.js\`, \`family-features.js\` and \`cloud-config.js\`, hosted on GitHub Pages (public source).
-- **Cloud:** Supabase Auth, account-scoped Postgres RLS on \`pc_accounts\`, \`pc_people\`, \`pc_choices\`, \`pc_imports\`, \`pc_web_ideas\`, and \`pc_search_logs\`; realtime publication for the family-facing choice/import tables.
-- **Storage:** Both \`pc-previews\` and \`pc-family-imports\` are **private** and use account-scoped object paths; signed URLs have time limits.
-- **Image discovery:** Deployed \`pumpkin-image-search\` Edge Function calls SerpApi server-side, with a server-held \`SERPAPI_KEY\`. It uses gateway \`verify_jwt: false\` with **manual user token and family-account verification inside the function**; do not remove those internal checks.
+- **Frontend:** Static `index.html`, `family-sync.js`, `family-features.js` and `cloud-config.js`, hosted on GitHub Pages (public source).
+- **Cloud:** Supabase Auth, account-scoped Postgres RLS on `pc_accounts`, `pc_people`, `pc_choices`, `pc_imports`, `pc_web_ideas`, and `pc_search_logs`; realtime publication for the family-facing choice/import tables.
+- **Storage:** Both `pc-previews` and `pc-family-imports` are **private** and use account-scoped object paths; signed URLs have time limits.
+- **Image discovery:** Deployed `pumpkin-image-search` Edge Function calls SerpApi server-side, with a server-held `SERPAPI_KEY`. It uses gateway `verify_jwt: false` with **manual user token and family-account verification inside the function**; do not remove those internal checks.
 - **Credentials:** The frontend holds a publishable Supabase key, **never a service-role key or SerpApi key**. Passwords are handled by Supabase Auth.
 - **Limitations:** External thumbnails still load from their source hosts; arbitrary websites may block them. Do not automatically mirror third-party copyrighted images. No offline caching of licensed previews or signed URLs is implemented.
 
 ## Deploy and verify
 
-- GitHub Pages: [settings](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages) → deploy \`main\` branch, repository root.
-- Supabase Auth: [URL configuration](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration) → allow \`https://jacobmgoodnight.github.io/pumpkin-family-organizer/\` for sign-in redirects.
-- Supabase secrets: [project dashboard](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn) → Edge Functions → Secrets → optional \`SERPAPI_KEY\`.
+- GitHub Pages: [settings](https://github.com/jacobmgoodnight/pumpkin-family-organizer/settings/pages) → deploy `main` branch, repository root.
+- Supabase Auth: [URL configuration](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn/auth/url-configuration) → allow `https://jacobmgoodnight.github.io/pumpkin-family-organizer/` for sign-in redirects.
+- Supabase secrets: [project dashboard](https://supabase.com/dashboard/project/wljddcebgmqzrgxjebkn) → Edge Functions → Secrets → optional `SERPAPI_KEY`.
 - No credentials or private original PDF/thumbnail files should be committed.
 
 **Engineering checks completed:** Repository bridge and feature wiring reviewed; private buckets and their uploaded preview counts checked; schema RLS and realtime publication reviewed; JavaScript syntax checked. There is still one Supabase Auth advisory about disabled leaked-password protection (which may depend on plan). [Supabase security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
