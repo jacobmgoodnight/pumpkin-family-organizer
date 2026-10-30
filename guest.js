@@ -156,14 +156,18 @@ function attachDialogClose(dialog,buttonId){
  dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
 }
 let openedItem=null;
-function openPreview(item){openedItem=item;refreshModal();$("preview-dialog").showModal();void images();}
+function openPreview(item){openedItem=item;
+ if($("compare-dialog").open)$("compare-dialog").close();
+ if(!$("preview-dialog").open)$("preview-dialog").showModal();
+ refreshModal();void images();
+}
 function refreshModal(){
  if(!openedItem||!$("preview-dialog").open)return;
  const item=openedItem;$("preview-title").textContent=item.name;
  const image=$("preview-image"),cached=previewCache.get(item.thumbnail);
  image.alt="Enlarged "+item.name;
  image.src=cached?.expires>Date.now()?cached.url:"app-icon.svg";
- if(item.thumbnail&&!cached)void images();
+ if(item.thumbnail&&(!cached||cached.expires<=Date.now()))void images();
  $("preview-description").textContent=[item.category,item.difficulty,item.source==="family"?"Family import":"Built-in design"].filter(Boolean).join(" · ");
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
@@ -183,7 +187,7 @@ function showCompare(){
    host.append(card);
  }
  if(compareIds.size<2){$("compare-dialog").close();return;}
- $("compare-dialog").showModal?.();
+ if(!$("compare-dialog").open)$("compare-dialog").showModal();
  void images();
 }
 async function printable(item){
@@ -232,8 +236,9 @@ function renderLineup(){
    const group=document.createElement("section");group.className="lineup-group";
    const name=document.createElement("strong");name.textContent=person.name+(person.id===me.personId?" · You":"");
    group.append(name);
-   const favorites=[...(familyChoices.get(person.id)||new Map())].filter(([,choice])=>choice.favorite);
-   const picks=favorites.filter(([,choice])=>choice.finalPick);
+   const all=[...(familyChoices.get(person.id)||new Map())];
+   const favorites=all.filter(([,choice])=>choice.favorite);
+   const picks=all.filter(([,choice])=>choice.finalPick);
    const line=(label,rows)=>{
      const caption=document.createElement("small");caption.textContent=label+": "+rows.length;
      const row=document.createElement("div");row.className="lineup-row";
