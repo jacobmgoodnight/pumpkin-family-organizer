@@ -65,7 +65,7 @@ Deno.serve(async(request)=>{
    }
    // Guests never authenticate as the parent and never get access to parent RLS.
    // The token authorizes exactly one person's choices until expiration/revocation.
-   if(!["guest","thumbs","choice","print"].includes(action))return fail("Unsupported action",400);
+   if(!["guest","thumbs","choice","print","search"].includes(action))return fail("Unsupported action",400);
    const token=text(body.token,43);
    if(!token||!TOKEN.test(token))return fail("Invitation invalid or expired",401);
    const tokenHash=await digest(token);
@@ -75,13 +75,53 @@ Deno.serve(async(request)=>{
    if(inviteError||!invite)return fail("Invitation invalid or expired",401);
    const uid=invite.owner_id,personId=invite.person_id;
    if(action==="guest"){
-     const [member,rows,imported]=await Promise.all([
+     const [member,people,rows,imported]=await Promise.all([
        admin.from("pc_people").select("display_name").eq("user_id",uid).eq("person_id",personId).maybeSingle(),
-       admin.from("pc_choices").select("template_id,favorite,final_pick").eq("user_id",uid).eq("person_id",personId).limit(2500),
+       admin.from("pc_people").select("person_id,display_name").eq("user_id",uid).limit(30),
+       admin.from("pc_choices").select("person_id,template_id,favorite,final_pick").eq("user_id",uid).or("favorite.eq.true,final_pick.eq.true").limit(10000),
        admin.from("pc_imports").select("id,name,category,difficulty,tags,thumbnail_path,original_path").eq("user_id",uid).order("created_at",{ascending:false}).limit(250)
      ]);
-     if(member.error||!member.data||rows.error||imported.error)throw Error("Guest view unavailable");
-     return reply({personId,name:member.data.display_name,expiresAt:invite.expires_at,choices:rows.data||[],imports:imported.data||[]});
+     if(member.error||!member.data||people.error||rows.error||imported.error)throw Error("Guest view unavailable");
+     const family=rows.data||[];
+     return reply({personId,name:member.data.display_name,expiresAt:invite.expires_at,
+       choices:family.filter(x=>x.person_id===personId).map(x=>({template_id:x.template_id,favorite:x.favorite,final_pick:x.final_pick})),
+       people:(people.data||[]).map(x=>({id:x.person_id,name:x.display_name})),
+       familyChoices:family.map(x=>({personId:x.person_id,templateId:x.template_id,favorite:!!x.favorite,finalPick:!!x.final_pick})),
+       imports:imported.data||[]});
+   }
+   if(action==="search"){
+     // Guest searches share the parent's finite monthly provider quota and 15h/40d caps.
+     const term=text(body.query,80)?.trim().replace(/\s+/g," ");
+     if(!term||term.length<2)return fail("Search for 2–80 characters",400);
+     const apiKey=Deno.env.get("SERPAPI_KEY")||"";
+     if(!apiKey)return fail("Online search is not connected",503);
+     const instant=Date.now();
+     const [hour,day]=await Promise.all([
+       admin.from("pc_search_logs").select("id",{count:"exact",head:true}).eq("user_id",uid).gte("created_at",new Date(instant-3600000).toISOString()),
+       admin.from("pc_search_logs").select("id",{count:"exact",head:true}).eq("user_id",uid).gte("created_at",new Date(instant-86400000).toISOString())
+     ]);
+     if(hour.error||day.error)throw Error("Usage check unavailable");
+     if((hour.count||0)>=15)return fail("Family search limit reached (15 per hour)",429);
+     if((day.count||0)>=40)return fail("Family search limit reached (40 per day)",429);
+     const {error:usageError}=await admin.from("pc_search_logs").insert({user_id:uid,query:term});
+     if(usageError)throw Error("Unable to record search usage");
+     const query=new URL("https://serpapi.com/search.json");
+     query.searchParams.set("engine","google_images");query.searchParams.set("q",term+" pumpkin carving stencil printable");
+     query.searchParams.set("safe","active");query.searchParams.set("hl","en");query.searchParams.set("gl","us");query.searchParams.set("api_key",apiKey);
+     const response=await fetch(query,{signal:AbortSignal.timeout(18000)});
+     if(!response.ok)return fail("Image search provider unavailable",502);
+     const json=await response.json();
+     if(json.error)return fail("Image search provider unavailable",502);
+     const safe=(value:unknown)=>{
+       if(typeof value!=="string"||value.length>1800)return null;
+       try{const link=new URL(value);return link.protocol==="https:"?link.href:null;}catch{return null;}
+     };
+     const results=(Array.isArray(json.images_results)?json.images_results:[])
+       .filter((x:any)=>!x.unsafe)
+       .map((x:any)=>({title:String(x.title||"Pumpkin pattern").slice(0,160),source:String(x.source||"Website").slice(0,80),
+         thumbnail:safe(x.thumbnail),sourceUrl:safe(x.link),originalImageUrl:safe(x.original)}))
+       .filter((x:any)=>x.thumbnail&&x.sourceUrl).slice(0,48);
+     return reply({query:term,provider:"Google Images via SerpApi",results});
    }
    if(action==="choice"){
      const templateId=text(body.templateId,160);
