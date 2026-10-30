@@ -78,3 +78,7 @@ On a phone, the organizer's top area is now a **single compact status strip** ra
 
 ## Shared online ideas from a private participant link (October 30, 2026)
 Invited family members can preview Google Images results, save a source link to the family's **Saved online ideas** collection, and favorite or compare that idea without an individual email account. Saved source links are visible after reload. They are **not** print-ready files: the organizer must import a permitted PDF/image for permanent printing. Built-in original PDFs stay on the organizer's computer. The family lineup is shown above guest catalog search, can be collapsed, and lets each person see the other family members' selections. Participant permissions allow editing only their own favorites/picks.
+
+
+### Private invitation gallery quick navigation
+Your private link opens with **family picks collapsed**, so you can start browsing. Tap **My favorites** or **My picks** to return to your own saved selections with one tap; the buttons show your current counts. **All designs** brings back the full gallery, and **Show family picks** expands the household lineup when you want to compare everyone's choices. These shortcuts never let you edit another person's favorites. Smart Search typing suggestions work here too, without calling Google or using search credits. For external Google Images results, open **Find more online** further down the page.
