@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261029c">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030a">
 </head><body>
 <header><div class="container head">
  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Your pumpkin designs</h1><p id="subtitle">Opening your private invitation…</p></div>
@@ -17,16 +17,20 @@
    <select id="person-view" aria-label="Choose a family member to view"></select>
    <span id="read-only" class="read-only" hidden>Viewing only · changes are disabled for other people</span>
   </div>
-  <div class="toolbar">
-   <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off"></label>
-   <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option></select></label>
-  </div>
   <nav class="guest-nav" aria-label="Family library actions">
-   <button id="family-lineup" type="button">👨‍👩‍👧‍👧 Family lineup</button>
+   <button id="family-lineup" type="button" aria-expanded="true">👨‍👩‍👧‍👧 Hide family picks</button>
    <button id="compare-open" type="button" disabled>Compare <span id="compare-count">0</span>/3</button>
    <button id="online-open" type="button">🌐 Find more online</button>
   </nav>
-  <section id="lineup-section" class="lineup" hidden aria-label="Family's favorites and picks"></section>
+  <section id="lineup-section" class="lineup" aria-label="Family favorites and picks"></section>
+  <h2 class="catalog-heading">Find your pumpkin</h2>
+  <div class="toolbar">
+   <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off"></label>
+   <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option><option value="web">Saved online ideas</option></select></label>
+  </div>
+  <div class="summary"><span id="count"></span><span id="totals"></span></div>
+  <div id="grid" class="cards"></div>
+  <button id="more" class="more" hidden>Show more designs</button>
   <section id="online-panel" class="online-panel" hidden>
    <div class="panel-heading"><h2>Find more online</h2><button id="online-close" type="button" aria-label="Close online results">✕</button></div>
    <form id="online-form" class="online-form">
@@ -37,10 +41,7 @@
    <div id="online-results" class="cards web-results"></div>
    <button id="online-more" class="more" hidden>Show more images</button>
   </section>
-  <div class="summary"><span id="count"></span><span id="totals"></span></div>
-  <div id="grid" class="cards"></div>
-  <button id="more" class="more" hidden>Show more designs</button>
-  <p class="note">Your personal link can change only your own favorites and Final Picks. You may view other family members' choices, compare designs, and search Google Images. Built-in originals remain on the organizer's computer.</p>
+  <p class="note">Your link saves your own favorites and picks. Saved web ideas are shared as source links, not printable files; the organizer can import authorized originals. Built-in originals remain on the organizer’s computer.</p>
   <button id="forget" class="quiet danger">Forget private link on this device</button>
  </section>
 </main>
@@ -54,5 +55,5 @@
  <div class="dialog-head"><h2 id="compare-title">Compare pumpkin designs</h2><button id="compare-close" type="button" aria-label="Close comparison">✕</button></div>
  <div id="compare-grid" class="compare-grid"></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261029d"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030a"></script>
 </body></html>

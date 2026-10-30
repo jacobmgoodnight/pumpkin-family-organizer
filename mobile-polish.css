@@ -317,3 +317,34 @@ body.family-connected #cloud-family-panel #organizer-links{min-height:36px;font-
  body.family-connected #cloud-family-panel #organizer-label::before{font-size:13px}
  body.family-connected #cloud-family-panel #cloud-status{font-size:10px!important}
 }
+
+
+/* Small-phone organizer: two columns for action controls and a full-width sort. */
+@media screen and (max-width:430px){
+ body.family-connected .profile-panel .profiles{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body.family-connected #cloud-family-panel #cloud-status{max-width:95px}
+ body.family-connected .pf-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body.family-connected .pf-actions>.pf-more{
+  grid-column:1/-1!important;grid-row:auto!important;
+ }
+ body.family-connected .pf-actions>.pf-more>summary{width:100%}
+ body.family-connected #catalog-area .toolbar-tail>.top-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body.family-connected #catalog-area .toolbar-tail .sort-inline{
+  grid-column:1/-1!important;grid-row:auto!important;
+ }
+ body.family-connected #catalog-area .toolbar-tail #surprise{
+  grid-column:1!important;grid-row:auto!important;
+ }
+ body.family-connected #catalog-area .toolbar-tail #clear-filters{
+  grid-column:2!important;grid-row:auto!important;
+ }
+ #family-profile-invites{max-width:100%;overflow-wrap:anywhere}
+ #family-profile-invites select{max-width:100%;width:100%}
+ #family-profile-invites button{min-width:0;white-space:normal}
+}

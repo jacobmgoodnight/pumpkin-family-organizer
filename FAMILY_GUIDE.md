@@ -74,3 +74,7 @@ Using your personal invitation, tap any pumpkin image to enlarge it. Save favori
 Tap **Find more online** to search Google Images inside the guest page; results appear as cards. Open the source to find an authorized printable or use **Share idea** to send the link to the organizer. This does not automatically import a PDF. Online searches share the family API allowance; viewing the 2,053 built-in patterns doesn't use search credits.
 
 On a phone, the organizer's top area is now a **single compact status strip** rather than a large account block. Tap **Links** to manage invitations or expand **Account settings** for the parent email, password and sign-out controls. The larger desktop organizer layout remains as before.
+
+
+## Shared online ideas from a private participant link (October 30, 2026)
+Invited family members can preview Google Images results, save a source link to the family's **Saved online ideas** collection, and favorite or compare that idea without an individual email account. Saved source links are visible after reload. They are **not** print-ready files: the organizer must import a permitted PDF/image for permanent printing. Built-in original PDFs stay on the organizer's computer. The family lineup is shown above guest catalog search, can be collapsed, and lets each person see the other family members' selections. Participant permissions allow editing only their own favorites/picks.

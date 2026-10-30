@@ -65,7 +65,7 @@ Deno.serve(async(request)=>{
    }
    // Guests never authenticate as the parent and never get access to parent RLS.
    // The token authorizes exactly one person's choices until expiration/revocation.
-   if(!["guest","thumbs","choice","print","search"].includes(action))return fail("Unsupported action",400);
+   if(!["guest","thumbs","choice","print","search","idea"].includes(action))return fail("Unsupported action",400);
    const token=text(body.token,43);
    if(!token||!TOKEN.test(token))return fail("Invitation invalid or expired",401);
    const tokenHash=await digest(token);
@@ -75,19 +75,20 @@ Deno.serve(async(request)=>{
    if(inviteError||!invite)return fail("Invitation invalid or expired",401);
    const uid=invite.owner_id,personId=invite.person_id;
    if(action==="guest"){
-     const [member,people,rows,imported]=await Promise.all([
+     const [member,people,rows,imported,ideas]=await Promise.all([
        admin.from("pc_people").select("display_name").eq("user_id",uid).eq("person_id",personId).maybeSingle(),
        admin.from("pc_people").select("person_id,display_name").eq("user_id",uid).limit(30),
        admin.from("pc_choices").select("person_id,template_id,favorite,final_pick").eq("user_id",uid).or("favorite.eq.true,final_pick.eq.true").limit(10000),
-       admin.from("pc_imports").select("id,name,category,difficulty,tags,thumbnail_path,original_path").eq("user_id",uid).order("created_at",{ascending:false}).limit(250)
+       admin.from("pc_imports").select("id,name,category,difficulty,tags,thumbnail_path,original_path").eq("user_id",uid).order("created_at",{ascending:false}).limit(250),
+       admin.from("pc_web_ideas").select("id,title,source_url,preview_url,source_name,created_at").eq("user_id",uid).order("created_at",{ascending:false}).limit(300)
      ]);
-     if(member.error||!member.data||people.error||rows.error||imported.error)throw Error("Guest view unavailable");
+     if(member.error||!member.data||people.error||rows.error||imported.error||ideas.error)throw Error("Guest view unavailable");
      const family=rows.data||[];
      return reply({personId,name:member.data.display_name,expiresAt:invite.expires_at,
        choices:family.filter(x=>x.person_id===personId).map(x=>({template_id:x.template_id,favorite:x.favorite,final_pick:x.final_pick})),
        people:(people.data||[]).map(x=>({id:x.person_id,name:x.display_name})),
        familyChoices:family.map(x=>({personId:x.person_id,templateId:x.template_id,favorite:!!x.favorite,finalPick:!!x.final_pick})),
-       imports:imported.data||[]});
+       imports:imported.data||[],ideas:ideas.data||[]});
    }
    if(action==="search"){
      // Guest searches share the parent's finite monthly provider quota and 15h/40d caps.
@@ -122,6 +123,34 @@ Deno.serve(async(request)=>{
          thumbnail:safe(x.thumbnail),sourceUrl:safe(x.link),originalImageUrl:safe(x.original)}))
        .filter((x:any)=>x.thumbnail&&x.sourceUrl).slice(0,48);
      return reply({query:term,provider:"Google Images via SerpApi",results});
+   }
+   if(action==="idea"){
+     // Guests may save web source links, not upload files or modify other people's choices.
+     const title=text(body.title,160)?.trim();
+     const sourceUrl=text(body.sourceUrl,1800),previewUrl=text(body.thumbnail,1800);
+     const sourceName=text(body.source,160)?.trim()||"Web source";
+     const searchTerm=text(body.searchTerm,120)?.trim()||"Family discovery";
+     const https=(value:string|null)=>{if(!value)return null;try{const url=new URL(value);return url.protocol==="https:"?url.href:null;}catch{return null;}};
+     const source=https(sourceUrl),preview=https(previewUrl);
+     if(!title||!source)return fail("Choose an image with a valid HTTPS source",400);
+     const {data:existing,error:existingError}=await admin.from("pc_web_ideas")
+       .select("id,title,source_url,preview_url,source_name").eq("user_id",uid).eq("source_url",source).maybeSingle();
+     if(existingError)throw existingError;
+     if(existing)return reply({idea:existing,alreadySaved:true});
+     const {count,error:countError}=await admin.from("pc_web_ideas").select("id",{count:"exact",head:true}).eq("user_id",uid);
+     if(countError)throw countError;
+     if((count||0)>=300)return fail("Family saved-idea list is full (300). Ask the organizer to tidy saved ideas.",409);
+     const {data:created,error:saveError}=await admin.from("pc_web_ideas").insert({
+       user_id:uid,title,source_url:source,preview_url:preview,source_name:sourceName,search_term:searchTerm
+     }).select("id,title,source_url,preview_url,source_name").single();
+     if(saveError){
+       if(saveError.code==="23505"){
+         const {data:previous}=await admin.from("pc_web_ideas").select("id,title,source_url,preview_url,source_name").eq("user_id",uid).eq("source_url",source).maybeSingle();
+         if(previous)return reply({idea:previous,alreadySaved:true});
+       }
+       throw saveError;
+     }
+     return reply({idea:created,alreadySaved:false});
    }
    if(action==="choice"){
      const templateId=text(body.templateId,160);

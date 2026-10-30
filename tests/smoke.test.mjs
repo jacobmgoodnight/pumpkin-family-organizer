@@ -189,3 +189,39 @@ test("Phone-only organizer reduction and versioned assets",()=>{
  assert.match(html,/family-sync\.js\?v=/);
  assert.match(file("guest.html"),/guest\.js\?v=/);
 });
+
+test("Participant web ideas are saved through the scoped invitation API",()=>{
+ const guest=file("guest.js"),edge=file("supabase/functions/pumpkin-profile-invites/index.ts"),page=file("guest.html");
+ assert.match(edge,/action==="idea"/);
+ assert.match(edge,/admin\.from\("pc_web_ideas"\)/);
+ assert.match(edge,/user_id:uid,title,source_url:source/);
+ assert.match(edge,/ideas:ideas\.data\|\|\[\]/);
+ assert.match(edge,/\.eq\("token_hash",tokenHash\)/);
+ assert.match(guest,/async function saveOnlineIdea/);
+ assert.match(guest,/api\(\{action:"choice",templateId:item\.id,favorite:true,finalPick:!!prior\.finalPick\}\)/);
+ assert.match(guest,/function openOnlinePreview/);
+ assert.match(guest,/function prepareIdeas/);
+ assert.match(guest,/if\(compare\)addCompare\(item\)/);
+ assert.match(page,/<option value="web">Saved online ideas<\/option>/);
+ assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('class="catalog-heading"'));
+ assert.ok(page.indexOf('id="online-panel"')>page.indexOf('id="grid"'));
+ assert.match(page,/id="family-lineup"[^>]+aria-expanded="true"/);
+});
+test("Participant search preserves exact match priority over curated tie preference",()=>{
+ const guest=file("guest.js");
+ const first=guest.indexOf("function guestScore("),last=guest.indexOf("function filter()",first);
+ assert.ok(first>0&&last>first);
+ const normalize=v=>String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");
+ const score=new Function("normalize",guest.slice(first,last)+"return guestScore;")(normalize);
+ assert.ok(score({name:"Ghost",category:"Other",tags:[]},"ghost")>score({name:"Ghostly Cat",category:"Other",tags:[]},"ghost"));
+ assert.ok(score({name:"Ghost",category:"Other",tags:[]},"ghost")>score({name:"Boo",category:"Ghosts",tags:[]},"ghost"));
+ assert.match(guest,/a\.source==="zombie"\?0:1/);
+});
+test("Small phones keep sort, Surprise Me and clear controls in separate cells",()=>{
+ const css=file("mobile-polish.css"),guestCss=file("guest.css");
+ assert.match(css,/@media screen and \(max-width:430px\)/);
+ assert.match(css,/\.toolbar-tail \.sort-inline\{[\s\S]*?grid-column:1\/-1!important/);
+ assert.match(css,/\.toolbar-tail #surprise\{[\s\S]*?grid-column:1!important/);
+ assert.match(guestCss,/@media\(max-width:600px\)/);
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+});
