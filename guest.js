@@ -437,6 +437,39 @@ async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  notice("Saved to family ideas"+(favorite?" and your favorites":"")+". Ask the organizer to import an authorized printable.");
  return item;
 }
+async function importOnlineImage(row){
+ if(!row.importTicket)throw Error("This result has no downloadable original image. Save the idea or try another result.");
+ if(!selectedIsMe())throw Error("Return to your own pumpkins to import a design.");
+ if(!confirm("Import this original image into your private family library? Only continue if you have permission to save it for family use. The image may still need quality checks before printing."))return null;
+ $("online-status").textContent="Downloading the original to private family storage…";
+ const result=await api({action:"import",ticket:row.importTicket,rightsConfirmed:true});
+ if(!result.imported?.id)throw Error("The image was not imported.");
+ await refreshFamily(true);
+ if(!familyRefreshing){
+   // Clear controls so the new design is visible, without leaving the online results behind.
+   $("filter").value="family";$("theme").value="all";$("difficulty").value="all";$("search").value="";
+   filter();
+ }
+ $("online-status").textContent=(result.alreadyImported?"Already in family library":"Imported into private family library")+" · Open / print the saved image and check quality.";
+ notice("🎃 "+(result.alreadyImported?"Already imported":"Imported successfully")+". Your family can now preview and favorite it.");
+ return library.get("family:"+result.imported.id)||null;
+}
+function makeImportButton(row){
+ const action=button("⬇ Import to family",async()=>{
+   action.disabled=true;action.textContent="Importing…";
+   try{
+     const item=await importOnlineImage(row);
+     if(item)action.textContent="✓ In family library";
+     else {action.disabled=false;action.textContent="⬇ Import to family";}
+   }catch(error){
+     action.disabled=false;action.textContent="⬇ Try import again";
+     $("online-status").textContent=error.message;
+     notice("Automatic import unavailable: "+error.message);
+   }
+ },"web-import");
+ if(!row.importTicket){action.disabled=true;action.title="Search result has no downloadable original image. Save the link instead.";action.textContent="Original unavailable";}
+ return action;
+}
 function openOnlinePreview(row){
  openedItem=null;
  const dialog=$("preview-dialog");
@@ -459,7 +492,7 @@ function openOnlinePreview(row){
    catch(error){notice("Could not save idea: "+error.message);}
    finally{compare.disabled=false;}
  });
- actions.append(save,compare);
+ actions.append(makeImportButton(row),save,compare);
  if(safeUrl(row.sourceUrl))actions.append(sourceLink(safeUrl(row.sourceUrl),"View original source ↗"));
  if(!dialog.open)dialog.showModal();
 }
@@ -490,7 +523,7 @@ function renderOnlineBatch(){
      try{await saveOnlineIdea(row,{favorite:true});save.textContent="✓ Saved & favorited";}
      catch(error){notice("Could not save idea: "+error.message);save.disabled=false;}
    },"web-save");
-   area.append(title,label,save,link,share);card.append(preview,area);host.append(card);
+   area.append(title,label,makeImportButton(row),save,link,share);card.append(preview,area);host.append(card);
  }
  onlineShown=Math.min(onlineResults.length,onlineShown+12);
  $("online-more").hidden=onlineShown>=onlineResults.length;
@@ -526,6 +559,18 @@ $("empty-reset").addEventListener("click",()=>{
 });
 mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
 $("filter").addEventListener("change",filter);
+for(const id of ["theme","difficulty","sort"])$(id).addEventListener("change",filter);
+$("surprise").addEventListener("click",()=>{
+ if(!selectedIsMe())return;
+ const list=matches.length?matches:catalog;
+ if(!list.length)return;
+ const item=list[Math.floor(Math.random()*list.length)];
+ openPreview(item);
+});
+$("clear-guest-filters").addEventListener("click",()=>{
+ $("search").value="";$("filter").value="all";$("theme").value="all";
+ $("difficulty").value="all";$("sort").value="curated";filter();
+});
 $("person-view").addEventListener("change",()=>{viewPersonSelection($("person-view").value);refreshModal();});
 $("back-to-me").addEventListener("click",()=>viewPersonSelection(me.personId));
 for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],["other-saved","all"]]){
