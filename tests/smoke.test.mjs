@@ -243,7 +243,7 @@ test("Private family gallery starts with collapsed lineup and first-class person
  assert.match(guest,/getItems:\(\)=>catalog/);
  assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
- assert.match(page,/guest\.js\?v=20261030c/);
+ assert.match(page,/guest\.js\?v=20261030d/);
 });
 
 test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
@@ -307,5 +307,5 @@ test("Find more online is a collapsed native disclosure underneath browsing",()=
  assert.match(guest,/\$\("online-panel"\)\.hidden=!own/);
  assert.match(css,/\.online-discovery-summary/);
  assert.match(css,/\.online-discovery a:visited/);
- assert.match(page,/guest\.css\?v=20261030c/);
+ assert.match(page,/guest\.css\?v=20261030d/);
 });
