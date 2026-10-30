@@ -243,7 +243,7 @@ test("Private family gallery starts with collapsed lineup and first-class person
  assert.match(guest,/getItems:\(\)=>catalog/);
  assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
- assert.match(page,/guest\.js\?v=20261030b/);
+ assert.match(page,/guest\.js\?v=20261030c/);
 });
 
 test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
@@ -257,4 +257,55 @@ test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
  assert.match(smart,/title\.source==="zombie"\?3:0/);
  assert.doesNotMatch(smart,/position:fixed/);
  assert.match(guest,/import \{mountSmartSuggestions\} from/);
+});
+
+test("Other family profile view exposes only that person's favorites or final picks",()=>{
+ const guest=file("guest.js"),page=file("guest.html");
+ const start=guest.indexOf("function matchesGuestSelection("),end=guest.indexOf("function filter()",start);
+ assert.ok(start>0&&end>start);
+ const fn=new Function("guestScore",guest.slice(start,end)+"return matchesGuestSelection;")(()=>0);
+ const item={name:"Skeleton",source:"zombie"};
+ const none={favorite:false,finalPick:false},fav={favorite:true,finalPick:false},picked={favorite:true,finalPick:true};
+ assert.equal(fn(item,none,"all","",false),false,"another person's unsaved catalog is hidden");
+ assert.equal(fn(item,none,"zombie","",false),false,"collection filter cannot reveal unsaved catalog");
+ assert.equal(fn(item,fav,"favorite","",false),true);
+ assert.equal(fn(item,fav,"picked","",false),false);
+ assert.equal(fn(item,picked,"picked","",false),true);
+ assert.equal(fn(item,none,"all","",true),true,"my full catalog remains browsable");
+ assert.match(guest,/viewPersonSelection\(\$\("person-view"\)\.value\)/);
+ assert.match(guest,/\$\("filter"\)\.value=mine\?"all":"favorite"/);
+ assert.match(page,/id="other-person-banner"/);
+ assert.match(page,/id="other-favorites"/);
+ assert.match(page,/id="other-picks"/);
+ assert.match(page,/id="back-to-me"/);
+ assert.match(guest,/\$\("browse-toolbar"\)\.hidden=!own/);
+});
+
+test("Private Final Pick celebration occurs only following an acknowledged newly saved pick",()=>{
+ const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
+ assert.match(guest,/if\(field==="finalPick"&&!before\.finalPick&&res\.finalPick\)celebratePick\(item\)/);
+ assert.match(guest,/function celebratePick\(item\)/);
+ assert.match(guest,/panel\.showModal\(\)/);
+ assert.match(guest,/3100/);
+ assert.match(page,/id="celebrate-dialog"/);
+ assert.match(page,/id="celebrate-heading"/);
+ assert.match(page,/id="celebrate-design"/);
+ assert.match(css,/@keyframes celebrate-fly/);
+ assert.match(css,/@keyframes celebrate-pop/);
+ assert.match(css,/prefers-reduced-motion:reduce/);
+ assert.match(css,/\.card\.selected-pick/);
+});
+
+test("Find more online is a collapsed native disclosure underneath browsing",()=>{
+ const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
+ assert.match(page,/<details id="online-panel"/);
+ assert.match(page,/class="online-discovery-summary"/);
+ assert.ok(page.indexOf('id="online-panel"')>page.indexOf('id="more"'));
+ assert.ok(!page.includes('id="online-open"'));
+ assert.ok(!page.includes('id="online-close"'));
+ assert.match(guest,/\$\("online-panel"\)\.addEventListener\("toggle"/);
+ assert.match(guest,/\$\("online-panel"\)\.hidden=!own/);
+ assert.match(css,/\.online-discovery-summary/);
+ assert.match(css,/\.online-discovery a:visited/);
+ assert.match(page,/guest\.css\?v=20261030c/);
 });

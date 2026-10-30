@@ -44,3 +44,68 @@
  .catalog-heading{margin:12px 0 3px}
  .summary{margin:8px 0}
 }
+
+
+/* The invited family experience is a first-class gallery, not an admin view. */
+.other-person-banner{margin:10px 0 12px;padding:12px;background:#1d3325;border:1px solid #74927a;border-radius:12px}
+.other-person-heading{display:flex;justify-content:space-between;align-items:start;gap:10px}
+.other-person-heading strong{font-size:15px;color:#f5d4a0}
+.other-person-heading p{font-size:12px;color:#c8d8c8;margin:5px 0 0}
+.other-person-heading button{border:1px solid #b69060;color:#fff0d9;background:#344a38;border-radius:9px;min-height:42px;padding:8px 12px;white-space:nowrap;cursor:pointer}
+.other-person-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:11px}
+.other-person-tabs button{min-width:0;min-height:44px;padding:7px 5px;border:1px solid #708570;background:#2b4233;border-radius:8px;color:#f3ede2;cursor:pointer}
+.other-person-tabs button[aria-pressed=true]{background:#e4aa6c;border-color:#f2cc99;color:#1a281c;font-weight:800}
+.card.selected-pick{border:2px solid #ddb56a;box-shadow:0 0 0 1px #b58b43,0 8px 22px #0006}
+.picked-label{width:fit-content;background:#64411e;border:1px solid #ddb56a;border-radius:7px;padding:4px 7px;font-size:11px;color:#fff1cb;font-weight:800}
+.guest-nav{margin-top:8px}
+.online-discovery{background:#192b20;border:1px solid #6e8a70;margin:22px 0 13px;padding:0;border-radius:13px;overflow:hidden}
+.online-discovery-summary{display:flex;gap:12px;align-items:center;padding:15px 17px;cursor:pointer;list-style:none;min-height:74px}
+.online-discovery-summary::-webkit-details-marker{display:none}
+.online-discovery-icon{font-size:26px;flex-shrink:0}
+.online-discovery-label{min-width:0;display:grid;gap:4px;flex:1}
+.online-discovery-label strong{font-size:16px;color:#f3d2a4}
+.online-discovery-label small{font-size:12px;color:#bfd2bf;line-height:1.4}
+.online-discovery-chevron{font-size:24px;color:#f3d2a4;transition:transform .18s ease}
+.online-discovery[open] .online-discovery-chevron{transform:rotate(180deg)}
+.online-discovery[open] .online-discovery-summary{border-bottom:1px solid #48674d}
+.online-discovery-content{padding:14px 16px 16px}
+.online-form button{background:#c79052;color:#18281b;border-color:#ddb77e;font-weight:800}
+.online-discovery a,.online-discovery a:visited{color:#f4c695;text-decoration:underline;text-decoration-thickness:1px}
+.online-discovery .web-results .card{background:#1e3326}
+.online-discovery .web-results .web-save{background:#dea367;color:#1b2b1d}
+@media(max-width:600px){
+ .other-person-banner{padding:10px}
+ .other-person-heading{align-items:center}
+ .other-person-heading strong{font-size:14px}
+ .other-person-heading button{font-size:12px;padding:7px;min-width:95px}
+ .other-person-tabs{gap:5px}
+ .other-person-tabs button{font-size:11px;line-height:1.2}
+ .online-discovery-summary{padding:12px;gap:10px}
+ .online-discovery-content{padding:11px}
+}
+
+/* Shared with the organizer's Final Pick celebration */
+.celebrate-dialog{border:0;padding:0;background:transparent;color:#fff;box-shadow:none;position:fixed;inset:0;margin:auto;max-width:min(94vw,610px);max-height:90vh;overflow:visible;text-align:center;pointer-events:none}
+.celebrate-dialog::backdrop{background:#08150e85}
+.celebrate-content{position:relative;border:2px solid #f4b763;border-radius:25px;background:linear-gradient(160deg,#2c542a,#17351d 66%,#513010);padding:27px 28px 30px;box-shadow:0 25px 80px #0009;animation:celebrate-pop .5s cubic-bezier(.12,.85,.15,1.12) both}
+.celebrate-hero{font-size:clamp(52px,10vw,85px);line-height:1.1;filter:drop-shadow(0 6px 6px #0006);animation:celebrate-bounce .75s ease-in-out 2 alternate}
+.celebrate-content h2{font-size:clamp(23px,5vw,35px);margin:8px 0;color:#ffe09e;line-height:1.2}
+.celebrate-content p{font-size:clamp(16px,3vw,23px);font-weight:800;color:white;margin:7px 0}
+.celebrate-subtitle{font-size:14px;color:#e5e6c7}
+.celebrate-emojis{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.celebrate-emojis span{position:absolute;left:50%;top:50%;font-size:30px;opacity:0;animation:celebrate-fly 2.35s ease-out forwards}
+.celebrate-emojis span:nth-child(1){--dx:-250px;--dy:-180px;animation-delay:.06s}
+.celebrate-emojis span:nth-child(2){--dx:230px;--dy:-180px;animation-delay:.10s}
+.celebrate-emojis span:nth-child(3){--dx:-280px;--dy:90px;animation-delay:.14s}
+.celebrate-emojis span:nth-child(4){--dx:250px;--dy:90px;animation-delay:.18s}
+.celebrate-emojis span:nth-child(5){--dx:-110px;--dy:-240px;animation-delay:.22s}
+.celebrate-emojis span:nth-child(6){--dx:140px;--dy:-230px;animation-delay:.26s}
+.celebrate-emojis span:nth-child(7){--dx:-190px;--dy:170px;animation-delay:.3s}
+.celebrate-emojis span:nth-child(8){--dx:205px;--dy:155px;animation-delay:.34s}
+.celebrate-emojis span:nth-child(9){--dx:0px;--dy:-260px;animation-delay:.38s}
+@keyframes celebrate-fly{0%{transform:translate(-50%,-50%) scale(.45) rotate(-15deg);opacity:0}16%{opacity:1}70%{opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.35) rotate(20deg);opacity:0}}
+@keyframes celebrate-pop{0%{transform:scale(.80);opacity:.2}100%{transform:scale(1);opacity:1}}
+@keyframes celebrate-bounce{0%{transform:rotate(-8deg) scale(1)}100%{transform:rotate(9deg) scale(1.1)}}
+@media(max-width:560px){.celebrate-emojis{transform:scale(.58)}.celebrate-content{padding:20px}.chosen-chip{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.celebrate-content,.celebrate-hero,.celebrate-emojis span{animation:none!important}.celebrate-emojis{display:none}}
+
