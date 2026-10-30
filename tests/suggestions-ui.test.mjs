@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const source=readFileSync(new URL("../search-suggestions.js",import.meta.url),"utf8");
-function createHarness(){
+function createHarness(options={}){
  const listeners={};
  function node(name="div"){
    const obj={name,style:{},hidden:false,children:[],parentElement:null,attrs:{},listeners:{},textContent:"",value:"",
@@ -13,7 +13,7 @@ function createHarness(){
      addEventListener(key,callback){this.listeners[key]=callback;},
      querySelectorAll(selector){return selector==="button"?this.children.filter(x=>x.name==="button"):[];},
      getBoundingClientRect(){return this.rect||{top:0,bottom:0,left:0,width:300};},
-     focus(){},dispatchEvent(event){this.listeners[event.type]?.(event);}
+     focus(){this.focused=true;},blur(){this.blurred=true;},dispatchEvent(event){this.listeners[event.type]?.(event);}
    };return obj;
  }
  const document={head:node("head"),activeElement:null,createElement:node,addEventListener(){}};
@@ -32,7 +32,7 @@ function createHarness(){
    {id:"1",name:"Ghostly Cat",source:"zombie",category:"Spooky"},
    {id:"2",name:"Ghostbusters",source:"extra",category:"Movies"},
    {id:"3",name:"Ghost Spider",source:"extra",category:"Costumes"}
- ],id:"test-suggestions"});
+ ],id:"test-suggestions",...options});
  return {document,host,input,vv,window};
 }
 
@@ -71,4 +71,14 @@ test("Choosing a suggestion updates the input and collapses the menu",()=>{
  assert.ok(input.value.startsWith("Ghost"));
  assert.equal(panel.hidden,true);
  assert.equal(input.attrs["aria-expanded"],"false");
+});
+
+test("Guest suggestion tap can dismiss keyboard rather than re-focus the input",()=>{
+ const {host,input}=createHarness({dismissOnChoose:true});
+ input.listeners.input();
+ const panel=host.children.find(item=>item.id==="test-suggestions");
+ panel.children[0].listeners.click();
+ assert.equal(input.blurred,true);
+ assert.notEqual(input.focused,true);
+ assert.equal(panel.hidden,true);
 });

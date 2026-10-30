@@ -146,3 +146,25 @@
 
 /* Saved search ideas do not pretend to be print-ready family files. */
 .idea-only-marker{display:block;border:1px solid #667f6c;background:#263b30;border-radius:7px;padding:6px;color:#f1d0a0!important;font-size:11px!important;font-weight:650}
+
+/* One-action Google discovery: query is visible without expanding a second panel. */
+.browse-online{display:block;width:100%;min-height:44px;margin:5px 0 12px;padding:9px 13px;border:1px solid #d3a26a;border-radius:9px;background:#2d4534;color:#ffdfaf;font-size:13px;font-weight:750;cursor:pointer;text-align:left}
+.browse-online[hidden]{display:none!important}
+.online-discovery{padding:0}
+.online-discovery .online-discovery-summary{min-height:58px;padding:12px 14px 7px;cursor:default}
+.online-discovery .online-discovery-label strong{font-size:15px}
+.online-discovery .online-form{padding:0 14px 13px;margin:0;align-items:end}
+.online-discovery #online-search-button{min-height:46px}
+.online-results-panel{border-top:1px solid #4b684c;padding:0 14px 12px}
+.online-results-panel>summary{list-style:none;padding:12px 2px;min-height:44px;display:flex;align-items:center;color:#efc596;font-size:13px;font-weight:700;cursor:pointer}
+.online-results-panel>summary::-webkit-details-marker{display:none}
+.online-results-panel>summary::after{content:"⌄";margin-left:auto;font-size:20px}
+.online-results-panel[open]>summary::after{content:"⌃"}
+.online-results-panel #online-status{margin:8px 0 11px}
+.online-results-panel #online-google-link{min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:600px){
+ .online-discovery .online-discovery-summary{min-height:50px;padding:9px 11px 5px}
+ .online-discovery .online-form{padding:0 11px 11px;gap:6px}
+ .online-results-panel{padding:0 11px 11px}
+ .browse-online{margin:4px 0 9px}
+}

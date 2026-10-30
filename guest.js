@@ -170,6 +170,9 @@ function updateQuickViews(){
  $("other-person-banner").hidden=own;
  $("browse-toolbar").hidden=!own;
  $("online-panel").hidden=!own;
+ const term=$("search").value.trim();
+ $("browse-online").hidden=!own||term.length<2;
+ if(own&&term.length>=2)$("browse-online").textContent="🌐 Find more online for “"+term.slice(0,36)+(term.length>36?"…":"")+"”";
  if(!own){
    const counts=selectionCount(viewPerson);
    $("other-person-title").textContent=who+"'s saved pumpkins";
@@ -544,6 +547,35 @@ function renderOnlineBatch(){
  $("online-more").hidden=onlineShown>=onlineResults.length;
  $("online-more").textContent="Show more images ("+(onlineResults.length-onlineShown)+" remaining)";
 }
+function googleImageSearchUrl(term){
+ return "https://www.google.com/search?tbm=isch&q="+encodeURIComponent(term+" pumpkin carving stencil printable");
+}
+function updateGoogleLink(){
+ const term=$("online-search").value.trim()||$("search").value.trim();
+ $("online-google-link").href=googleImageSearchUrl(term||"pumpkin carving stencil");
+}
+function dismissSearchKeyboard(input){
+ input.blur();
+}
+function updateOnlineResultSummary(){
+ const count=onlineResults.length;
+ $("online-results-toggle").textContent=count
+   ?"Google Images results ("+count+") · Tap to show or hide"
+   :"Online search results and help";
+}
+async function requestOnlineSearch(term){
+ const query=term.trim();
+ if(query.length<2){
+   $("online-search").focus();
+   return;
+ }
+ $("online-search").value=query;
+ dismissSearchKeyboard($("online-search"));
+ updateGoogleLink();
+ $("online-results-panel").open=true;
+ $("online-panel").scrollIntoView({behavior:"smooth",block:"nearest"});
+ await searchOnline(query,true);
+}
 async function searchOnline(term,reuse=true){
  const q=term.trim();if(q.length<2){$("online-status").textContent="Enter at least 2 letters.";return;}
  if(onlinePending)return;
@@ -552,17 +584,19 @@ async function searchOnline(term,reuse=true){
  if(reuse&&cache&&Date.now()-cache.time<15*60*1000){
    onlineResults=cache.results;onlineShown=0;$("online-results").replaceChildren();
    $("online-status").textContent=onlineResults.length+" results · Recent search reused without spending credits";
-   renderOnlineBatch();return;
+   updateOnlineResultSummary();renderOnlineBatch();return;
  }
- onlinePending=true;$("online-status").textContent="Searching Google Images…";$("online-results").replaceChildren();$("online-more").hidden=true;
+ onlinePending=true;$("online-search-button").disabled=true;$("online-search-button").textContent="Searching…";$("browse-online").disabled=true;
+ $("online-status").textContent="Searching Google Images…";$("online-results").replaceChildren();$("online-more").hidden=true;
  try{
    const data=await api({action:"search",query:q});
    onlineResults=data.results||[];onlineShown=0;onlineCache.set(key,{time:Date.now(),results:onlineResults});
    if(onlineCache.size>12)onlineCache.delete(onlineCache.keys().next().value);
    $("online-status").textContent=onlineResults.length+" image ideas · Original sources may have usage restrictions. Online searches share the family's 15/hour, 40/day limits.";
-   renderOnlineBatch();
+   updateOnlineResultSummary();renderOnlineBatch();
  }catch(error){$("online-status").textContent="Unable to search: "+error.message+". You can still browse your existing catalog.";}
- finally{onlinePending=false;}
+ 
+ finally{onlinePending=false;$("online-search-button").disabled=false;$("online-search-button").textContent="Search images";$("browse-online").disabled=false;}
 }
 $("search").addEventListener("input",filter);
 for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
@@ -572,7 +606,16 @@ $("empty-reset").addEventListener("click",()=>{
  if(selectedIsMe())selectQuickView("all");
  else viewPersonSelection(me.personId);
 });
-mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
+const guestSuggestions=mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions",dismissOnChoose:true});
+$("search").addEventListener("keydown",event=>{
+ if(event.key==="Enter"){
+   event.preventDefault();
+   dismissSearchKeyboard($("search"));
+   guestSuggestions.hide();
+   filter();
+ }
+});
+$("browse-online").addEventListener("click",()=>void requestOnlineSearch($("search").value));
 $("filter").addEventListener("change",filter);
 for(const id of ["theme","difficulty","sort"])$(id).addEventListener("change",filter);
 $("surprise").addEventListener("click",()=>{
@@ -599,11 +642,14 @@ $("family-lineup").addEventListener("click",()=>{
  $("family-lineup").setAttribute("aria-expanded",String(!section.hidden));
  renderLineup();
 });
-$("online-panel").addEventListener("toggle",()=>{
- if($("online-panel").open&&!$("online-search").value.trim())$("online-search").value=$("search").value.trim();
+$("online-search").addEventListener("input",updateGoogleLink);
+$("online-form").addEventListener("submit",event=>{
+ event.preventDefault();
+ dismissSearchKeyboard($("online-search"));
+ void requestOnlineSearch($("online-search").value);
 });
-$("online-form").addEventListener("submit",event=>{event.preventDefault();void searchOnline($("online-search").value,false);});
 $("online-more").addEventListener("click",renderOnlineBatch);
+updateGoogleLink();updateOnlineResultSummary();
 $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-person-invite");location.href="./";});
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
