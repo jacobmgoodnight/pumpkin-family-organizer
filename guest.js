@@ -14,6 +14,7 @@ let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=n
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
 let savedIdeas=[];
+let celebrateTimer=null;
 const notice=value=>{$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
 const button=(label,handler,cls="")=>{
@@ -89,17 +90,19 @@ function guestScore(item,q){
  if(category.includes(q))return 200;
  return -1;
 }
+// Other family profiles are saved shortlists, never a second full catalog.
+function matchesGuestSelection(item,choice,kind,q,isOwner){
+ if(!isOwner&&!choice.favorite&&!choice.finalPick)return false;
+ if(kind==="zombie"&&item.source!=="zombie")return false;
+ if(kind==="family"&&item.source!=="family")return false;
+ if(kind==="web"&&item.source!=="web")return false;
+ if(kind==="favorite"&&!choice.favorite)return false;
+ if(kind==="picked"&&!choice.finalPick)return false;
+ return guestScore(item,q)>=0;
+}
 function filter(){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
- matches=catalog.filter(item=>{
-   const s=stateFor(item.id);
-   if(kind==="zombie"&&item.source!=="zombie")return false;
-   if(kind==="family"&&item.source!=="family")return false;
-   if(kind==="web"&&item.source!=="web")return false;
-   if(kind==="favorite"&&!s.favorite)return false;
-   if(kind==="picked"&&!s.finalPick)return false;
-   return guestScore(item,q)>=0;
- });
+ matches=catalog.filter(item=>matchesGuestSelection(item,stateFor(item.id),kind,q,selectedIsMe()));
  matches.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
  visible=24;render();
 }
@@ -113,6 +116,21 @@ function selectQuickView(kind){
  $("search").value="";
  filter();
 }
+function viewPersonSelection(personId){
+ if(!me)return;
+ const mine=personId===me.personId;
+ viewPerson=personId;
+ $("person-view").value=personId;
+ $("filter").value=mine?"all":"favorite";
+ $("search").value="";
+ filter();
+}
+function chooseOtherList(kind){
+ if(selectedIsMe())return;
+ $("filter").value=kind;
+ $("search").value="";
+ filter();
+}
 function updateQuickViews(){
  const selected=$("filter").value,own=selectedIsMe(),counts=selectionCount(me?.personId);
  $("quick-favorites-count").textContent=String(counts.favorites);
@@ -122,9 +140,21 @@ function updateQuickViews(){
    $(id).setAttribute("aria-pressed",String(pressed));
  }
  const who=people.find(x=>x.id===viewPerson)?.name||"Family";
- $("view-heading").textContent=selected==="favorite"?(own?"My favorites":who+"'s favorites")
-   :selected==="picked"?(own?"My final picks":who+"'s final picks")
-   :selected==="all"?"Find your pumpkin":"Find your pumpkin";
+ $("view-heading").textContent=!own?who+"'s saved pumpkins"
+   :selected==="favorite"?"My favorites"
+   :selected==="picked"?"My final picks":"Find your pumpkin";
+ $("guest-views").hidden=!own;
+ $("other-person-banner").hidden=own;
+ $("browse-toolbar").hidden=!own;
+ $("online-panel").hidden=!own;
+ if(!own){
+   const counts=selectionCount(viewPerson);
+   $("other-person-title").textContent=who+"'s saved pumpkins";
+   $("other-person-description").textContent=counts.favorites+" favorites · "+counts.picks+" final picks. You can preview and compare, but only "+who+" can change these.";
+   for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],["other-saved","all"]]){
+     $(id).setAttribute("aria-pressed",String(kind===selected));
+   }
+ }
 }
 function createImage(item,click){
  const control=button("",click,"image-open");control.setAttribute("aria-label","Enlarge "+item.name);
@@ -147,8 +177,19 @@ async function saveChoice(item,field){
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
+   if(field==="finalPick"&&!before.finalPick&&res.finalPick)celebratePick(item);
  }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
  render();renderLineup();refreshModal();
+}
+// The same pumpkin celebration as the main organizer, after a confirmed save.
+function celebratePick(item){
+ const panel=$("celebrate-dialog");
+ $("celebrate-heading").textContent="🎉 "+(me?.name||"You")+", you found your pumpkin!";
+ $("celebrate-design").textContent=item?.name||"Your final design";
+ if(celebrateTimer)clearTimeout(celebrateTimer);
+ if(panel.open)panel.close();
+ panel.showModal();
+ celebrateTimer=setTimeout(()=>{if(panel.open)panel.close();celebrateTimer=null;},3100);
 }
 function addCompare(item){
  if(compareIds.has(item.id))compareIds.delete(item.id);
@@ -183,10 +224,14 @@ function render(){
  const host=$("grid");host.replaceChildren();
  for(const item of matches.slice(0,visible)){
    const card=document.createElement("article");card.className="card";
+   if(stateFor(item.id).finalPick)card.classList.add("selected-pick");
    card.append(createImage(item,()=>openPreview(item)));
    const area=document.createElement("div");area.className="content";
    const title=document.createElement("strong");title.textContent=item.name;
    const category=document.createElement("small");category.textContent=item.category+(item.difficulty?" · "+item.difficulty:"");
+   if(stateFor(item.id).finalPick){
+     const tag=document.createElement("span");tag.className="picked-label";tag.textContent="🎃 Final pick";area.append(tag);
+   }
    area.append(title,category,itemActions(item));
    const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
@@ -307,7 +352,7 @@ function renderLineup(){
      if(!rows.length){const empty=document.createElement("span");empty.className="note";empty.textContent="Nothing selected yet";row.append(empty);}
      for(const [id] of rows.slice(0,50)){
        const item=library.get(id);if(!item)continue;
-       row.append(button(item.name,()=>{viewPerson=person.id;$("person-view").value=person.id;filter();openPreview(item);},"lineup-chip"));
+       row.append(button(item.name,()=>{viewPersonSelection(person.id);openPreview(item);},"lineup-chip"));
      }
      group.append(caption,row);
    };
@@ -424,21 +469,21 @@ async function searchOnline(term,reuse=true){
  }catch(error){$("online-status").textContent="Unable to search: "+error.message+". You can still browse your existing catalog.";}
  finally{onlinePending=false;}
 }
-function openOnline(){
- const section=$("online-panel");
- section.hidden=false;$("online-search").value=$("search").value.trim()||$("online-search").value;
- section.scrollIntoView({behavior:"smooth",block:"nearest"});
- if($("online-search").value.trim().length>=2)void searchOnline($("online-search").value);
- else $("online-status").textContent="Enter a design or character to find Google Images suggestions.";
-}
 $("search").addEventListener("input",filter);
 for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
  $(id).addEventListener("click",()=>selectQuickView(kind));
 }
-$("empty-reset").addEventListener("click",()=>selectQuickView("all"));
+$("empty-reset").addEventListener("click",()=>{
+ if(selectedIsMe())selectQuickView("all");
+ else viewPersonSelection(me.personId);
+});
 mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
 $("filter").addEventListener("change",filter);
-$("person-view").addEventListener("change",()=>{viewPerson=$("person-view").value;compareIds.clear();updateCompare();filter();refreshModal();});
+$("person-view").addEventListener("change",()=>{viewPersonSelection($("person-view").value);refreshModal();});
+$("back-to-me").addEventListener("click",()=>viewPersonSelection(me.personId));
+for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],["other-saved","all"]]){
+ $(id).addEventListener("click",()=>chooseOtherList(kind));
+}
 $("more").addEventListener("click",()=>{visible+=24;render();});
 $("compare-open").addEventListener("click",showCompare);
 $("family-lineup").addEventListener("click",()=>{
@@ -447,8 +492,9 @@ $("family-lineup").addEventListener("click",()=>{
  $("family-lineup").setAttribute("aria-expanded",String(!section.hidden));
  renderLineup();
 });
-$("online-open").addEventListener("click",openOnline);
-$("online-close").addEventListener("click",()=>{$("online-panel").hidden=true;});
+$("online-panel").addEventListener("toggle",()=>{
+ if($("online-panel").open&&!$("online-search").value.trim())$("online-search").value=$("search").value.trim();
+});
 $("online-form").addEventListener("submit",event=>{event.preventDefault();void searchOnline($("online-search").value,false);});
 $("online-more").addEventListener("click",renderOnlineBatch);
 $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-person-invite");location.href="./";});
