@@ -21,7 +21,7 @@ const SERVICE_KEYS=Deno.env.get("SUPABASE_SECRET_KEYS");
 const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||(()=>{try{return JSON.parse(SERVICE_KEYS||"{}").default||"";}catch{return"";}})();
 
 const MAX_IMPORT_BYTES=6*1024*1024;
-const toB64=(data:Uint8Array)=>btoa(String.fromCharCode(...data)).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+const toB64=(data:Uint8Array)=>btoa(String.fromCharCode(...data)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const fromB64=(value:string)=>Uint8Array.from(atob(value.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
 async function ticketKey(){
  const raw=new TextEncoder().encode(SERVICE_KEY);
@@ -47,11 +47,11 @@ function safeRemoteImage(value:unknown){
  if(typeof value!=="string"||value.length>1800)return null;
  try{
    const url=new URL(value);
-   const h=url.hostname.toLowerCase().replace(/\\.$/,"");
+   const h=url.hostname.toLowerCase().replace(/\.$/,"");
    if(url.protocol!=="https:"||url.port&&url.port!=="443"||url.username||url.password)return null;
    if(h==="localhost"||h.endsWith(".localhost")||h.endsWith(".local")||h.endsWith(".internal")||h.endsWith(".test")||h.endsWith(".invalid")||h.endsWith(".example")||h.endsWith(".onion"))return null;
    // Do not allow IP literals or numeric-only hosts (including alternate IPv4 notation).
-   if(h.includes(":")||/^\\[/.test(h)||/^[0-9.]+$/.test(h)||!/^[a-z0-9.-]+$/.test(h)||!h.includes("."))return null;
+   if(h.includes(":")||/^\[/.test(h)||/^[0-9.]+$/.test(h)||!/^[a-z0-9.-]+$/.test(h)||!h.includes("."))return null;
    return url.href;
  }catch{return null;}
 }
