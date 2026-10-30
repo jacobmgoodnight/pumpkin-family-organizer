@@ -12,6 +12,7 @@ const token=sessionStorage.getItem("pumpkin-person-invite");
 let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
+let savedIdeas=[];
 const notice=value=>{$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
 const button=(label,handler,cls="")=>{
@@ -65,23 +66,49 @@ function prepareImports(rows){
  }
  library=new Map(catalog.map(x=>[x.id,x]));
 }
+function prepareIdeas(rows){
+ savedIdeas=Array.isArray(rows)?rows:[];
+ catalog=catalog.filter(x=>x.source!=="web");
+ for(const x of savedIdeas){
+   const sourceUrl=safeUrl(x.source_url),thumbnail=safeUrl(x.preview_url);
+   if(!x.id||!sourceUrl)continue;
+   catalog.push({id:"web:"+x.id,name:x.title||"Saved online idea",
+     category:"Saved online ideas",source:"web",tags:[],thumbnail:thumbnail||"",
+     sourceUrl,sourceName:x.source_name||"Website"});
+ }
+ library=new Map(catalog.map(x=>[x.id,x]));
+}
+function guestScore(item,q){
+ if(!q)return 0;
+ const name=normalize(item.name),category=normalize(item.category),tags=(item.tags||[]).map(normalize);
+ if(name===q)return 1000;
+ if(name.startsWith(q))return 800;
+ if(name.includes(q))return 600;
+ if(tags.some(t=>t.includes(q)))return 400;
+ if(category.includes(q))return 200;
+ return -1;
+}
 function filter(){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
  matches=catalog.filter(item=>{
    const s=stateFor(item.id);
    if(kind==="zombie"&&item.source!=="zombie")return false;
    if(kind==="family"&&item.source!=="family")return false;
+   if(kind==="web"&&item.source!=="web")return false;
    if(kind==="favorite"&&!s.favorite)return false;
    if(kind==="picked"&&!s.finalPick)return false;
-   return !q||normalize([item.name,item.category,...(item.tags||[])].join(" ")).includes(q);
+   return guestScore(item,q)>=0;
  });
- matches.sort((a,b)=>(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
+ matches.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
  visible=24;render();
 }
 function createImage(item,click){
  const control=button("",click,"image-open");control.setAttribute("aria-label","Enlarge "+item.name);
  const img=document.createElement("img");img.loading="lazy";img.alt=item.name+" carving preview";
- if(item.thumbnail){img.dataset.preview=item.thumbnail;const cached=previewCache.get(item.thumbnail);if(cached&&cached.expires>Date.now())img.src=cached.url;}
+ img.referrerPolicy="no-referrer";
+ img.addEventListener("error",()=>{if(!img.src.endsWith("/app-icon.svg"))img.src="app-icon.svg";});
+ if(item.source==="web")img.src=safeUrl(item.thumbnail)||"app-icon.svg";
+ else if(item.thumbnail){img.dataset.preview=item.thumbnail;const cached=previewCache.get(item.thumbnail);if(cached&&cached.expires>Date.now())img.src=cached.url;}
  else img.src="app-icon.svg";
  control.append(img);return control;
 }
@@ -91,13 +118,13 @@ async function saveChoice(item,field){
  const before=stateFor(item.id,person),next={...before,[field]:!before[field]};
  if(field==="favorite"&&!next.favorite)next.finalPick=false;
  if(field==="finalPick"&&next.finalPick)next.favorite=true;
- map.set(item.id,next);render();refreshModal();
+ map.set(item.id,next);render();renderLineup();refreshModal();
  try{
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
  }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
- render();refreshModal();
+ render();renderLineup();refreshModal();
 }
 function addCompare(item){
  if(compareIds.has(item.id))compareIds.delete(item.id);
@@ -141,6 +168,7 @@ function render(){
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
    area.append(compare);
    if(item.importId)area.append(button("Open printable ↗",()=>printable(item),"print"));
+   if(item.source==="web"&&item.sourceUrl)area.append(sourceLink(item.sourceUrl,"Open source ↗"));
    card.append(area);host.append(card);
  }
  $("more").hidden=matches.length<=visible;
@@ -168,13 +196,15 @@ function refreshModal(){
  image.alt="Enlarged "+item.name;
  if(item.thumbnail)image.dataset.preview=item.thumbnail;
  else delete image.dataset.preview;
- image.src=cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg";
- if(item.thumbnail&&(!cached||cached.expires<=Date.now()))void images();
+ image.referrerPolicy="no-referrer";
+ image.src=item.source==="web"?(safeUrl(item.thumbnail)||"app-icon.svg"):(cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg");
+ if(item.thumbnail&&item.source!=="web"&&(!cached||cached.expires<=Date.now()))void images();
  $("preview-description").textContent=[item.category,item.difficulty,item.source==="family"?"Family import":"Built-in design"].filter(Boolean).join(" · ");
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
  if(item.importId)actions.append(button("Open printable ↗",()=>printable(item)));
+ if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
  else{const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
 }
 function showCompare(){
@@ -228,6 +258,10 @@ async function images(){
    if(imagesQueued){imagesQueued=false;void images();}
  }
 }
+function sourceLink(url,label){
+ const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener noreferrer";
+ a.referrerPolicy="no-referrer";a.textContent=label;a.className="web-card-link";return a;
+}
 function renderLineup(){
  const wrap=$("lineup-section");wrap.replaceChildren();
  if(wrap.hidden)return;
@@ -259,7 +293,7 @@ function renderLineup(){
 async function refreshFamily(){
  try{
    const updated=await api({action:"guest"});
-   setFamilyData(updated);prepareImports(updated.imports);
+   setFamilyData(updated);prepareImports(updated.imports);prepareIdeas(updated.ideas);
    filter();renderLineup();notice("");
  }catch(error){notice("Could not refresh family selections: "+error.message);}
 }
@@ -337,7 +371,7 @@ async function start(){
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
-   catalog=items;setFamilyData(data);prepareImports(data.imports);notice("");filter();
+   catalog=items;setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);notice("");filter();renderLineup();
  }catch(error){notice(error.message+". Ask the organizer for a new link if yours expired or was revoked.");sessionStorage.removeItem("pumpkin-person-invite");}
 }
 void start();
