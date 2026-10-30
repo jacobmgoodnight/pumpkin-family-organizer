@@ -13,7 +13,7 @@ function createHarness(){
      addEventListener(key,callback){this.listeners[key]=callback;},
      querySelectorAll(selector){return selector==="button"?this.children.filter(x=>x.name==="button"):[];},
      getBoundingClientRect(){return this.rect||{top:0,bottom:0,left:0,width:300};},
-     dispatchEvent(event){this.listeners[event.type]?.(event);}
+     focus(){},dispatchEvent(event){this.listeners[event.type]?.(event);}
    };return obj;
  }
  const document={head:node("head"),activeElement:null,createElement:node,addEventListener(){}};
