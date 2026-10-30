@@ -82,3 +82,6 @@ Invited family members can preview Google Images results, save a source link to 
 
 ### Private invitation gallery quick navigation
 Your private link opens with **family picks collapsed**, so you can start browsing. Tap **My favorites** or **My picks** to return to your own saved selections with one tap; the buttons show your current counts. **All designs** brings back the full gallery, and **Show family picks** expands the household lineup when you want to compare everyone's choices. These shortcuts never let you edit another person's favorites. Smart Search typing suggestions work here too, without calling Google or using search credits. For external Google Images results, open **Find more online** further down the page.
+
+### When using a private family invitation
+Choose your own name to browse the entire gallery and save your favorites and Final Picks. Choosing someone else's name now shows only **their saved favorites**; use **Final Picks** or **All saved** to change that shortlist, or tap **My pumpkins** to return to your own gallery. Other people's selections are always read-only. **Find more online** is a collapsible section below the gallery; opening it does not run a paid Google search. A newly saved Final Pick gets the pumpkin celebration after the server confirms it.
