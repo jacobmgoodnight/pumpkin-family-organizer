@@ -65,3 +65,12 @@ The main search is now the first control on the page, with family profiles immed
 ### Browsing from a phone
 
 The opening order is now **choose your person → search → Browse / Favorites / Picks / Lineup**. Select the correct person first, then type in the search box; matching suggestions appear as you type. Tap **More filters** if you want to narrow to Zombie Pumpkins, Additional Templates, themes or difficulty; tap it again to hide them. The smaller **Import**, **Online designs**, and **Tools** actions are beneath the navigation tabs. On narrow screens, **Best match**, **Surprise**, and **Clear** sit together in one row, leaving more room for the pattern cards. The compact organizer strip still has **Links** for creating or replacing family invitations.
+
+
+### Guest links now have the full selection experience
+
+Using your personal invitation, tap any pumpkin image to enlarge it. Save favorites and select Final Picks for **your own profile**. Add 2–3 designs to Compare to see them side by side. Use **Whose designs are you viewing?** to check another family member's favorites and picks, or select **Family lineup** to browse everyone's choices. You may look but not edit other family members' lists.
+
+Tap **Find more online** to search Google Images inside the guest page; results appear as cards. Open the source to find an authorized printable or use **Share idea** to send the link to the organizer. This does not automatically import a PDF. Online searches share the family API allowance; viewing the 2,053 built-in patterns doesn't use search credits.
+
+On a phone, the organizer's top area is now a **single compact status strip** rather than a large account block. Tap **Links** to manage invitations or expand **Account settings** for the parent email, password and sign-out controls. The larger desktop organizer layout remains as before.

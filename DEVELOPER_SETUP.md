@@ -79,3 +79,11 @@ Creating a link revokes prior live links for that person, stores only a SHA-256 
 Guest artwork is delivered by 20-minute signed URLs to private, owner-scoped preview files. The extra `guest-catalog.json` asset contains only catalog metadata, not licensed artwork or credentials. Guest access to imported printable files uses short-lived signed URLs for records belonging to the bound owner.
 
 Acceptance testing still needed: parent creates a link → guest opens in private browsing → guest changes favorites and picks → parent sees the changes → parent revokes → guest requests fail. Test also expiration and print behavior. Static CI alone cannot prove a real parent/guest session works.
+
+## Guest expanded features and server permissions (October 29, 2026)
+
+The `pumpkin-profile-invites` Edge Function also supports the guest-only `search` action. Every request requires a live, nonrevoked invite token; Google search uses the **server-side** `SERPAPI_KEY`, shares the parent's `pc_search_logs` quotas (15/hour and 40/day), requests safe Google Images results, and returns up to 48 image cards. Guest searches must not leak SerpApi keys or parent JWTs into the browser. Guests can only share a source URL with the organizer, not upload third-party assets through this capability.
+
+The `guest` action now additionally returns the family's names and only **favorite/final-pick** states for the same household, excluding account emails and other parent data. The `choice` branch remains hard-coded to the verified invitation's `uid` and `personId`, so selecting another person's view in guest.js has no corresponding write power. The portal includes a preview dialog, comparison dialog, read-only family lineup and signed previews. Manual testing should include changing the selected member then attempting a write (UI disabled and server always binds write to the invite's person), and separately testing that a revoked/expired token rejects searches.
+
+The phone-only organizer header now uses mobile-scoped CSS and asset version markers; desktop layout remains unchanged. It is important to test actual iPhone Safari rather than assuming CSS checks prove the visual layout.

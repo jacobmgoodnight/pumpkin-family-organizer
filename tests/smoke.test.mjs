@@ -160,3 +160,32 @@ test("Compact organizer identifies the parent and keeps invitation management",(
  assert.match(sync,/session\.user\.email/);
  assert.match(sync,/family-profile-invites/);
 });
+
+test("Guest full preview, compare, family read-only and Google cards",()=>{
+ const guest=file("guest.js"),page=file("guest.html"),edge=file("supabase/functions/pumpkin-profile-invites/index.ts");
+ assert.match(page,/id="preview-dialog"/);assert.match(page,/id="compare-dialog"/);
+ assert.match(page,/id="person-view"/);assert.match(page,/id="lineup-section"/);
+ assert.match(page,/id="online-results"/);assert.match(page,/id="online-form"/);
+ assert.match(guest,/function openPreview\(item\)/);
+ assert.match(guest,/function showCompare\(\)/);
+ assert.match(guest,/function renderLineup\(\)/);
+ assert.match(guest,/selectedIsMe\(\)/);
+ assert.match(guest,/function searchOnline\(/);
+ assert.match(guest,/action:"search"/);
+ assert.match(edge,/action==="search"/);
+ assert.match(edge,/familyChoices:family\.map/);
+ assert.match(edge,/\.eq\("user_id",uid\)/);
+ assert.match(edge,/person_id:personId,template_id:templateId/);
+ assert.match(edge,/SERPAPI_KEY/);
+ assert.match(edge,/15 per hour/);assert.match(edge,/40 per day/);
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+});
+test("Phone-only organizer reduction and versioned assets",()=>{
+ const css=file("mobile-polish.css");
+ assert.match(css,/body\.family-connected header\.top>\.shell\{display:none!important\}/);
+ assert.match(css,/body\.family-connected #cloud-family-panel/);
+ assert.match(css,/max-width:700px/);
+ assert.match(html,/mobile-polish\.css\?v=/);
+ assert.match(html,/family-sync\.js\?v=/);
+ assert.match(file("guest.html"),/guest\.js\?v=/);
+});
