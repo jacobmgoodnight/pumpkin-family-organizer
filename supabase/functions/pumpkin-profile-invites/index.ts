@@ -19,6 +19,71 @@ function key(){
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"";
 const SERVICE_KEYS=Deno.env.get("SUPABASE_SECRET_KEYS");
 const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||(()=>{try{return JSON.parse(SERVICE_KEYS||"{}").default||"";}catch{return"";}})();
+
+const MAX_IMPORT_BYTES=6*1024*1024;
+const toB64=(data:Uint8Array)=>btoa(String.fromCharCode(...data)).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+const fromB64=(value:string)=>Uint8Array.from(atob(value.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+async function ticketKey(){
+ const raw=new TextEncoder().encode(SERVICE_KEY);
+ return crypto.subtle.importKey("raw",raw,{name:"HMAC",hash:"SHA-256"},false,["sign","verify"]);
+}
+async function issueImportTicket(payload:Record<string,unknown>){
+ const part=toB64(new TextEncoder().encode(JSON.stringify(payload)));
+ const sig=new Uint8Array(await crypto.subtle.sign("HMAC",await ticketKey(),new TextEncoder().encode(part)));
+ return part+"."+toB64(sig);
+}
+async function openImportTicket(value:string){
+ const [part,sig,...rest]=value.split(".");
+ if(!part||!sig||rest.length||part.length>8000)return null;
+ try{
+   const valid=await crypto.subtle.verify("HMAC",await ticketKey(),fromB64(sig),new TextEncoder().encode(part));
+   if(!valid)return null;
+   const payload=JSON.parse(new TextDecoder().decode(fromB64(part)));
+   if(!payload||typeof payload!=="object"||!Number.isFinite(payload.exp)||payload.exp<Date.now())return null;
+   return payload;
+ }catch{return null;}
+}
+function safeRemoteImage(value:unknown){
+ if(typeof value!=="string"||value.length>1800)return null;
+ try{
+   const url=new URL(value);
+   const h=url.hostname.toLowerCase().replace(/\\.$/,"");
+   if(url.protocol!=="https:"||url.port&&url.port!=="443"||url.username||url.password)return null;
+   if(h==="localhost"||h.endsWith(".localhost")||h.endsWith(".local")||h.endsWith(".internal")||h.endsWith(".test")||h.endsWith(".invalid")||h.endsWith(".example")||h.endsWith(".onion"))return null;
+   // Do not allow IP literals or numeric-only hosts (including alternate IPv4 notation).
+   if(h.includes(":")||/^\\[/.test(h)||/^[0-9.]+$/.test(h)||!/^[a-z0-9.-]+$/.test(h)||!h.includes("."))return null;
+   return url.href;
+ }catch{return null;}
+}
+async function readImageFromRemote(url:string){
+ let response:Response;
+ try{response=await fetch(url,{redirect:"manual",headers:{"Accept":"image/jpeg,image/png,image/webp"},signal:AbortSignal.timeout(12000)});}
+ catch{return {error:"That image host blocked the download or timed out. Save the idea instead, or try another result."};}
+ if(!response.ok)return {error:"This image host does not allow an automatic download. Try another image or save the idea."};
+ const length=Number(response.headers.get("content-length")||0);
+ if(length>MAX_IMPORT_BYTES)return {error:"Image too large for automatic import (6 MB limit)."};
+ const contentType=(response.headers.get("content-type")||"").split(";")[0].trim().toLowerCase();
+ const mime=contentType==="image/jpg"?"image/jpeg":contentType;
+ if(!["image/jpeg","image/png","image/webp"].includes(mime))return {error:"This source is not a JPG, PNG or WebP image. Save the idea instead."};
+ const reader=response.body?.getReader();if(!reader)return {error:"This image host returned no downloadable image."};
+ const parts:Uint8Array[]=[],limit=MAX_IMPORT_BYTES;let total=0;
+ try{
+   while(true){
+     const {done,value}=await reader.read();if(done)break;
+     total+=value.length;
+     if(total>limit){await reader.cancel();return {error:"Image too large for automatic import (6 MB limit)."};}
+     parts.push(value);
+   }
+ }catch{return {error:"The image download stopped before it finished."};}
+ if(total<500)return {error:"Downloaded image is too small to use as a stencil."};
+ const bytes=new Uint8Array(total);let at=0;for(const part of parts){bytes.set(part,at);at+=part.length;}
+ const jpeg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+ const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71;
+ const webp=bytes[0]===82&&bytes[1]===73&&bytes[2]===70&&bytes[3]===70&&bytes[8]===87&&bytes[9]===69&&bytes[10]===66&&bytes[11]===80;
+ if((mime==="image/jpeg"&&!jpeg)||(mime==="image/png"&&!png)||(mime==="image/webp"&&!webp))return {error:"The site returned a non-image response instead of the original."};
+ return {bytes,mime,extension:mime==="image/jpeg"?"jpg":mime==="image/png"?"png":"webp"};
+}
+
 Deno.serve(async(request)=>{
  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
  if(request.method!=="POST")return fail("Method not allowed",405);
@@ -65,7 +130,7 @@ Deno.serve(async(request)=>{
    }
    // Guests never authenticate as the parent and never get access to parent RLS.
    // The token authorizes exactly one person's choices until expiration/revocation.
-   if(!["guest","thumbs","choice","print","search","idea"].includes(action))return fail("Unsupported action",400);
+   if(!["guest","thumbs","choice","print","search","idea","import"].includes(action))return fail("Unsupported action",400);
    const token=text(body.token,43);
    if(!token||!TOKEN.test(token))return fail("Invitation invalid or expired",401);
    const tokenHash=await digest(token);
@@ -120,9 +185,46 @@ Deno.serve(async(request)=>{
      const results=(Array.isArray(json.images_results)?json.images_results:[])
        .filter((x:any)=>!x.unsafe)
        .map((x:any)=>({title:String(x.title||"Pumpkin pattern").slice(0,160),source:String(x.source||"Website").slice(0,80),
-         thumbnail:safe(x.thumbnail),sourceUrl:safe(x.link),originalImageUrl:safe(x.original)}))
+         thumbnail:safe(x.thumbnail),sourceUrl:safe(x.link),originalImageUrl:safeRemoteImage(x.original)}))
        .filter((x:any)=>x.thumbnail&&x.sourceUrl).slice(0,48);
-     return reply({query:term,provider:"Google Images via SerpApi",results});
+     // Only server-vetted Google result URLs receive time-limited signed import tickets.
+     const signed=await Promise.all(results.map(async row=>({...row,
+       importTicket:row.originalImageUrl?await issueImportTicket({uid,hash:tokenHash,exp:Date.now()+20*60000,
+         title:row.title,source:row.source,sourceUrl:row.sourceUrl,imageUrl:row.originalImageUrl}):null})));
+     return reply({query:term,provider:"Google Images via SerpApi",results:signed});
+   }
+   if(action==="import"){
+     // An invited person may only import the exact image returned by this
+     // server's recent Google search, never pass an arbitrary fetch URL.
+     if(body.rightsConfirmed!==true)return fail("Confirm you have permission to save this image for family use.",400);
+     const signed=text(body.ticket,8000),data=signed?await openImportTicket(signed):null;
+     if(!data||data.uid!==uid||data.hash!==tokenHash)return fail("Import link expired. Run the image search again.",401);
+     const title=text(data.title,160),source=text(data.source,160),origin=text(data.sourceUrl,1800);
+     const original=safeRemoteImage(data.imageUrl);
+     if(!title||!origin||!original)return fail("This result cannot be imported automatically.",400);
+     const {data:found,error:checkError}=await admin.from("pc_imports")
+       .select("id,name,thumbnail_path,original_path").eq("user_id",uid).eq("source_url",origin).limit(1).maybeSingle();
+     if(checkError)throw checkError;
+     if(found)return reply({imported:found,alreadyImported:true});
+     const {count,error:countError}=await admin.from("pc_imports").select("id",{count:"exact",head:true}).eq("user_id",uid);
+     if(countError)throw countError;
+     if((count||0)>=250)return fail("Family library has reached its 250-import limit.",409);
+     const downloaded=await readImageFromRemote(original);
+     if("error" in downloaded)return fail(downloaded.error,422);
+     const id=crypto.randomUUID(),path=uid+"/imports/"+id+"-original."+downloaded.extension;
+     const {error:uploadError}=await admin.storage.from("pc-family-imports")
+       .upload(path,downloaded.bytes,{contentType:downloaded.mime,cacheControl:"3600",upsert:false});
+     if(uploadError)return fail("The private image upload failed. Please try another result.",502);
+     const record={id,user_id:uid,name:title,category:"Online imports",tags:["google images"],
+       difficulty:"",thumbnail_path:path,original_path:path,origin:"web",
+       source_url:origin,source_name:source||"Online result"};
+     const {data:created,error:insertError}=await admin.from("pc_imports").insert(record)
+       .select("id,name,category,difficulty,tags,thumbnail_path,original_path").single();
+     if(insertError){
+       await admin.storage.from("pc-family-imports").remove([path]);
+       return fail("The family library could not save this import. Please retry.",502);
+     }
+     return reply({imported:created,alreadyImported:false});
    }
    if(action==="idea"){
      // Guests may save web source links, not upload files or modify other people's choices.
