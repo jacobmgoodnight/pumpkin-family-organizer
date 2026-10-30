@@ -13,7 +13,7 @@ const token=sessionStorage.getItem("pumpkin-person-invite");
 let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
-let savedIdeas=[];
+let savedIdeas=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0;
 let celebrateTimer=null;
 const notice=value=>{$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
@@ -100,10 +100,33 @@ function matchesGuestSelection(item,choice,kind,q,isOwner){
  if(kind==="picked"&&!choice.finalPick)return false;
  return guestScore(item,q)>=0;
 }
+function updateDiscoveryFilters(){
+ const theme=$("theme"),difficulty=$("difficulty");
+ const oldTheme=theme.value,oldDifficulty=difficulty.value;
+ const fill=(select,values,allLabel,selected)=>{
+   select.replaceChildren(new Option(allLabel,"all"));
+   for(const value of values)select.append(new Option(value,value));
+   select.value=values.includes(selected)?selected:"all";
+ };
+ fill(theme,[...new Set(catalog.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All themes",oldTheme);
+ fill(difficulty,[...new Set(catalog.map(x=>x.difficulty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All difficulties",oldDifficulty);
+}
+function guestSort(items,mode,q){
+ if(mode==="az")return items.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ if(mode==="za")return items.sort((a,b)=>b.name.localeCompare(a.name,undefined,{numeric:true}));
+ if(mode==="random"){
+   const rank=id=>{let h=sortRandomSeed|0;for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);return h>>>0;};
+   return items.sort((a,b)=>rank(a.id)-rank(b.id));
+ }
+ return items.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
+}
 function filter(){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
- matches=catalog.filter(item=>matchesGuestSelection(item,stateFor(item.id),kind,q,selectedIsMe()));
- matches.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
+ const theme=$("theme").value,difficulty=$("difficulty").value;
+ matches=catalog.filter(item=>matchesGuestSelection(item,stateFor(item.id),kind,q,selectedIsMe())
+   &&(theme==="all"||item.category===theme)
+   &&(difficulty==="all"||item.difficulty===difficulty));
+ guestSort(matches,$("sort").value,q);
  visible=24;render();
 }
 function selectQuickView(kind){
@@ -122,7 +145,7 @@ function viewPersonSelection(personId){
  viewPerson=personId;
  $("person-view").value=personId;
  $("filter").value=mine?"all":"favorite";
- $("search").value="";
+ $("search").value="";$("theme").value="all";$("difficulty").value="all";
  filter();
 }
 function chooseOtherList(kind){
@@ -172,13 +195,14 @@ async function saveChoice(item,field){
  const before=stateFor(item.id,person),next={...before,[field]:!before[field]};
  if(field==="favorite"&&!next.favorite)next.finalPick=false;
  if(field==="finalPick"&&next.finalPick)next.favorite=true;
- map.set(item.id,next);render();renderLineup();refreshModal();
+ choiceWrites++;map.set(item.id,next);render();renderLineup();refreshModal();
  try{
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
    if(field==="finalPick"&&!before.finalPick&&res.finalPick)celebratePick(item);
  }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
+ choiceWrites=Math.max(0,choiceWrites-1);
  render();renderLineup();refreshModal();
 }
 // The same pumpkin celebration as the main organizer, after a confirmed save.
@@ -236,7 +260,7 @@ function render(){
    const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
    area.append(compare);
-   if(item.importId)area.append(button("Open printable ↗",()=>printable(item),"print"));
+   if(item.importId)area.append(button("📄 Open / print image",()=>printable(item),"print"));
    if(item.source==="web"&&item.sourceUrl)area.append(sourceLink(item.sourceUrl,"Open source ↗"));
    card.append(area);host.append(card);
  }
@@ -274,7 +298,7 @@ function refreshModal(){
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
- if(item.importId)actions.append(button("Open printable ↗",()=>printable(item)));
+ if(item.importId)actions.append(button("📄 Open / print image",()=>printable(item)));
  if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
  else{const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
 }
@@ -299,7 +323,7 @@ async function printable(item){
  try{
    const {url}=await api({action:"print",importId:item.importId});
    if(popup)popup.location.href=url;
-   else{const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Open authorized printable";$("alert").replaceChildren(link);}
+   else{const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Tap to open / print saved image";$("alert").replaceChildren(link);}
  }catch(error){if(popup)popup.close();notice(error.message);}
 }
 async function images(){
@@ -334,39 +358,65 @@ function sourceLink(url,label){
  a.referrerPolicy="no-referrer";a.textContent=label;a.className="web-card-link";return a;
 }
 function renderLineup(){
- const wrap=$("lineup-section");wrap.replaceChildren();
- if(wrap.hidden)return;
- const head=document.createElement("div");head.className="lineup-head";
- const title=document.createElement("strong");title.textContent="Family favorites & final picks";
- head.append(title,button("Refresh",()=>refreshFamily()));wrap.append(head);
+ const wrap=$("lineup-section");wrap.replaceChildren();if(wrap.hidden)return;
+ const heading=document.createElement("div");heading.className="lineup-head";
+ const title=document.createElement("strong");title.textContent="Family pumpkin picks";
+ heading.append(title,button("Refresh",()=>refreshFamily(true)));wrap.append(heading);
  for(const person of people){
    const group=document.createElement("section");group.className="lineup-group";
    const name=document.createElement("strong");name.textContent=person.name+(person.id===me.personId?" · You":"");
-   group.append(name);
    const all=[...(familyChoices.get(person.id)||new Map())];
-   const favorites=all.filter(([,choice])=>choice.favorite);
-   const picks=all.filter(([,choice])=>choice.finalPick);
-   const line=(label,rows)=>{
-     const caption=document.createElement("small");caption.textContent=label+": "+rows.length;
-     const row=document.createElement("div");row.className="lineup-row";
-     if(!rows.length){const empty=document.createElement("span");empty.className="note";empty.textContent="Nothing selected yet";row.append(empty);}
-     for(const [id] of rows.slice(0,50)){
-       const item=library.get(id);if(!item)continue;
-       row.append(button(item.name,()=>{viewPersonSelection(person.id);openPreview(item);},"lineup-chip"));
-     }
-     group.append(caption,row);
-   };
-   line("Final picks",picks);
-   line("Favorites",favorites);
+   const picks=all.filter(([,v])=>v.finalPick),favs=all.filter(([,v])=>v.favorite&&!v.finalPick);
+   const label=document.createElement("p");label.className="lineup-count";
+   label.textContent=picks.length+" final picks · "+(picks.length+favs.length)+" favorites";
+   group.append(name,label);
+   const gallery=document.createElement("div");gallery.className="lineup-visual";
+   const ordered=[...picks,...favs].slice(0,8);
+   for(const [id,choice] of ordered){
+     const item=library.get(id);if(!item)continue;
+     const tile=document.createElement("div");tile.className="lineup-visual-item";
+     tile.append(createImage(item,()=>{viewPersonSelection(person.id);openPreview(item);}));
+     const desc=document.createElement("small");desc.textContent=(choice.finalPick?"🎃 ":"♥ ")+item.name;
+     tile.append(desc);gallery.append(tile);
+   }
+   if(!ordered.length){
+     const empty=document.createElement("p");empty.className="note";empty.textContent="No pumpkins chosen yet";gallery.append(empty);
+   }
+   group.append(gallery);
+   const see=button("See "+person.name+"'s saved pumpkins",()=>{viewPersonSelection(person.id);$("view-heading").scrollIntoView({behavior:"smooth",block:"start"});});
+   see.className="lineup-view-all";group.append(see);
    wrap.append(group);
  }
+ void images();
 }
-async function refreshFamily(){
+function familyFingerprint(data){
+ const choices=[...(data.familyChoices||data.choices||[])].sort((a,b)=>String(a.personId||a.person_id).localeCompare(String(b.personId||b.person_id))||String(a.templateId||a.template_id).localeCompare(String(b.templateId||b.template_id)));
+ const imports=[...(data.imports||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ const ideas=[...(data.ideas||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ return JSON.stringify([choices,imports,ideas,data.people||[]]);
+}
+function loadFamilySnapshot(data){
+ lastFamilyFingerprint=familyFingerprint(data);
+ setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);
+ updateDiscoveryFilters();filter();renderLineup();
+}
+async function refreshFamily(manual=false){
+ if(familyRefreshing||choiceWrites||!me||(!manual&&document.hidden))return;
+ familyRefreshing=true;
+ if(manual)$("sync-status").textContent="Checking for updates…";
  try{
    const updated=await api({action:"guest"});
-   setFamilyData(updated);prepareImports(updated.imports);prepareIdeas(updated.ideas);
-   filter();renderLineup();notice("");
- }catch(error){notice("Could not refresh family selections: "+error.message);}
+   if(choiceWrites)return;
+   const stamp=familyFingerprint(updated);
+   if(stamp!==lastFamilyFingerprint){
+     loadFamilySnapshot(updated);
+     $("sync-status").textContent="Family updates loaded ✓";
+   }else if(manual)$("sync-status").textContent="Up to date ✓";
+   else $("sync-status").textContent="Synced · checks every 20s";
+ }catch(error){
+   $("sync-status").textContent="Sync paused · tap to retry";
+   if(manual)notice("Could not refresh family selections: "+error.message);
+ }finally{familyRefreshing=false;}
 }
 async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  const sourceUrl=safeUrl(row.sourceUrl);
@@ -390,6 +440,42 @@ async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  notice("Saved to family ideas"+(favorite?" and your favorites":"")+". Ask the organizer to import an authorized printable.");
  return item;
 }
+async function importOnlineImage(row){
+ if(!row.importTicket)throw Error("This result has no downloadable original image. Save the idea or try another result.");
+ if(!selectedIsMe())throw Error("Return to your own pumpkins to import a design.");
+ if(!confirm("Import this original image into your private family library? Only continue if you have permission to save it for family use. The image may still need quality checks before printing."))return null;
+ $("online-status").textContent="Downloading the original to private family storage…";
+ const result=await api({action:"import",ticket:row.importTicket,rightsConfirmed:true});
+ if(!result.imported?.id)throw Error("The image was not imported.");
+ await refreshFamily(true);
+ if(!familyRefreshing){
+   // Clear controls so the new design is visible, without leaving the online results behind.
+   $("filter").value="family";$("theme").value="all";$("difficulty").value="all";$("search").value="";
+   filter();
+ }
+ $("online-status").textContent=(result.alreadyImported?"Already in family library":"Imported into private family library")+" · Open / print the saved image and check quality.";
+ notice("🎃 "+(result.alreadyImported?"Already imported":"Imported successfully")+". Your family can now preview and favorite it.");
+ return library.get("family:"+result.imported.id)||null;
+}
+function makeImportButton(row){
+ const action=button("⬇ Import to family",async()=>{
+   action.disabled=true;action.textContent="Importing…";
+   try{
+     const item=await importOnlineImage(row);
+     if(item){
+       action.textContent="✓ In family library";
+       if($("preview-dialog").open)openPreview(item);
+     }
+     else {action.disabled=false;action.textContent="⬇ Import to family";}
+   }catch(error){
+     action.disabled=false;action.textContent="⬇ Try import again";
+     $("online-status").textContent=error.message;
+     notice("Automatic import unavailable: "+error.message);
+   }
+ },"web-import");
+ if(!row.importTicket){action.disabled=true;action.title="Search result has no downloadable original image. Save the link instead.";action.textContent="Original unavailable";}
+ return action;
+}
 function openOnlinePreview(row){
  openedItem=null;
  const dialog=$("preview-dialog");
@@ -412,7 +498,7 @@ function openOnlinePreview(row){
    catch(error){notice("Could not save idea: "+error.message);}
    finally{compare.disabled=false;}
  });
- actions.append(save,compare);
+ actions.append(makeImportButton(row),save,compare);
  if(safeUrl(row.sourceUrl))actions.append(sourceLink(safeUrl(row.sourceUrl),"View original source ↗"));
  if(!dialog.open)dialog.showModal();
 }
@@ -443,7 +529,7 @@ function renderOnlineBatch(){
      try{await saveOnlineIdea(row,{favorite:true});save.textContent="✓ Saved & favorited";}
      catch(error){notice("Could not save idea: "+error.message);save.disabled=false;}
    },"web-save");
-   area.append(title,label,save,link,share);card.append(preview,area);host.append(card);
+   area.append(title,label,makeImportButton(row),save,link,share);card.append(preview,area);host.append(card);
  }
  onlineShown=Math.min(onlineResults.length,onlineShown+12);
  $("online-more").hidden=onlineShown>=onlineResults.length;
@@ -479,6 +565,18 @@ $("empty-reset").addEventListener("click",()=>{
 });
 mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
 $("filter").addEventListener("change",filter);
+for(const id of ["theme","difficulty","sort"])$(id).addEventListener("change",filter);
+$("surprise").addEventListener("click",()=>{
+ if(!selectedIsMe())return;
+ const list=matches.length?matches:catalog;
+ if(!list.length)return;
+ const item=list[Math.floor(Math.random()*list.length)];
+ openPreview(item);
+});
+$("clear-guest-filters").addEventListener("click",()=>{
+ $("search").value="";$("filter").value="all";$("theme").value="all";
+ $("difficulty").value="all";$("sort").value="curated";filter();
+});
 $("person-view").addEventListener("change",()=>{viewPersonSelection($("person-view").value);refreshModal();});
 $("back-to-me").addEventListener("click",()=>viewPersonSelection(me.personId));
 for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],["other-saved","all"]]){
@@ -501,6 +599,11 @@ $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-per
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
 window.addEventListener("focus",()=>{if(me)void refreshFamily();});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me)void refreshFamily();});
+$("sync-status").addEventListener("click",()=>void refreshFamily(true));
+// Token-scoped reads, not unauthenticated Realtime subscriptions that bypass RLS.
+// Poll only while visible; foreground resumes immediately, keeping private links current.
+setInterval(()=>{if(me&&!document.hidden)void refreshFamily();},20000);
 async function start(){
  if(!token){notice("No invitation found. Ask the organizer to share your private link again.");return;}
  if(!config?.url||!config?.publishableKey){notice("Private gallery configuration is unavailable.");return;}
@@ -510,7 +613,7 @@ async function start(){
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
-   catalog=items;setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);notice("");filter();renderLineup();
+   catalog=items;loadFamilySnapshot(data);notice("");
  }catch(error){notice(error.message+". Ask the organizer for a new link if yours expired or was revoked.");sessionStorage.removeItem("pumpkin-person-invite");}
 }
 void start();

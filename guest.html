@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030c">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030d">
 </head><body>
 <header><div class="container head">
  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Your pumpkin designs</h1><p id="subtitle">Opening your private invitation…</p></div>
@@ -40,8 +40,20 @@
   <div id="browse-toolbar" class="toolbar">
    <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off"></label>
    <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option><option value="web">Saved online ideas</option></select></label>
+   <details id="guest-advanced" class="guest-advanced">
+    <summary>More filters &amp; sorting</summary>
+    <div class="advanced-grid">
+     <label>Theme <select id="theme"><option value="all">All themes</option></select></label>
+     <label>Difficulty <select id="difficulty"><option value="all">All difficulties</option></select></label>
+     <label>Sort <select id="sort"><option value="curated">Most relevant / curated</option><option value="az">Name A–Z</option><option value="za">Name Z–A</option><option value="random">Surprise order</option></select></label>
+    </div>
+   </details>
+   <div class="guest-tools">
+    <button id="surprise" type="button">🎲 Surprise me</button>
+    <button id="clear-guest-filters" type="button">Clear filters</button>
+   </div>
   </div>
-  <div class="summary"><span id="count"></span><span id="totals"></span></div>
+  <div class="summary"><span id="count"></span><span id="totals"></span><span id="sync-status" role="status" aria-live="polite">Synced</span></div>
   <div id="grid" class="cards"></div>
   <div id="empty-results" class="guest-empty" hidden>
    <p>No matching designs in this view yet.</p>
@@ -58,7 +70,7 @@
      <label for="online-search">Search Google Images</label><input id="online-search" type="search" placeholder="Minecraft pumpkin stencil…" required minlength="2">
      <button type="submit">Search images</button>
    </form>
-   <p class="note" id="online-status" role="status">Results are suggestions from external websites. Open the source before using a design.</p>
+   <p class="note" id="online-status" role="status">Tap an image to preview, then try one-tap Import to Family. Some websites block downloads.</p>
    <div id="online-results" class="cards web-results"></div>
    <button id="online-more" class="more" hidden>Show more images</button>
    </div>
@@ -83,5 +95,5 @@
  <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
  <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030c"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030d"></script>
 </body></html>
