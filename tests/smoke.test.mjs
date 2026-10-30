@@ -118,11 +118,11 @@ test("Guest links use scoped server auth and catalog metadata only",()=>{
    assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../"+path,import.meta.url).pathname]));
 });
 
-test("Search-first layout has one real input and preserves core handlers",()=>{
+test("Family-first layout keeps one real search input and original handlers",()=>{
  const css=file("mobile-polish.css"),searchFirst=file("search-first.js");
  assert.equal((html.match(/id="search"/g)||[]).length,1);
  assert.equal((html.match(/id="settings-open"/g)||[]).length,1);
- assert.ok(html.indexOf('id="search-first"')<html.indexOf('class="profile-panel"'));
+ assert.ok(html.indexOf('class="profile-panel"')<html.indexOf('id="search-first"'));
  assert.ok(html.indexOf('id="search-first"')<html.indexOf('id="tabs"'));
  assert.ok(html.includes('id="advanced-filters"'));
  assert.match(html,/src="search-first\.js"/);
