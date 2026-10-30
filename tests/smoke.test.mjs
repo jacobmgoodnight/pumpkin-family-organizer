@@ -141,3 +141,22 @@ test("Organizer identity is separate from selected family profile",()=>{
  assert.match(sync,/Organizer/);
  assert.match(sync,/parent account|Parent account/i);
 });
+
+test("Carver choice comes first and mobile has one filter disclosure",()=>{
+ const css=file("mobile-polish.css");
+ const body=html.slice(html.indexOf('<main class="shell workspace">'));
+ assert.ok(body.indexOf('class="profile-panel"')<body.indexOf('id="search-first"'));
+ assert.equal((html.match(/id="search"/g)||[]).length,1);
+ assert.match(html,/id="filter-toggle"/);
+ assert.match(css,/\.advanced-filters:not\(\[open\]\)\{display:none!important\}/);
+ assert.match(css,/\.advanced-filters>summary\{display:none!important\}/);
+ assert.match(css,/\.view-tabs\{[\s\S]*?grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+ assert.match(css,/#catalog-area \.toolbar-tail>\.top-actions\{[\s\S]*?grid-template-columns:minmax\(0,1\.3fr\)/);
+});
+test("Compact organizer identifies the parent and keeps invitation management",()=>{
+ assert.match(sync,/class="cloud-main"/);
+ assert.match(sync,/id="organizer-identity"/);
+ assert.match(sync,/id="organizer-links"/);
+ assert.match(sync,/session\.user\.email/);
+ assert.match(sync,/family-profile-invites/);
+});

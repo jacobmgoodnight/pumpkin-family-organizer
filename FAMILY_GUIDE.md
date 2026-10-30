@@ -60,3 +60,8 @@ Privacy: Anyone who receives the link can act as that person, so do not post it 
 The main search is now the first control on the page, with family profiles immediately beneath it. Type a few letters to see suggestions; choose your name so favorites and final picks go to your profile. The **More filters** button reveals collection, theme and difficulty filters when needed; tapping it again hides them. Use the four tabs to browse all, favorites, final picks or the family lineup.
 
 **Who is the organizer?** It's whoever is signed into the existing adult Supabase parent account—the email displayed beside **Organizer** at the top. Choosing Jacob, Shelby, Charlotte or Violet does **not** make that person an administrator. The **Share links** shortcut opens the invite manager. If a person loses their link or you want a new one, tap **Replace link** for that person and copy/share the newly generated URL. The old link is immediately invalidated.
+
+
+### Browsing from a phone
+
+The opening order is now **choose your person → search → Browse / Favorites / Picks / Lineup**. Select the correct person first, then type in the search box; matching suggestions appear as you type. Tap **More filters** if you want to narrow to Zombie Pumpkins, Additional Templates, themes or difficulty; tap it again to hide them. The smaller **Import**, **Online designs**, and **Tools** actions are beneath the navigation tabs. On narrow screens, **Best match**, **Surprise**, and **Clear** sit together in one row, leaving more room for the pattern cards. The compact organizer strip still has **Links** for creating or replacing family invitations.

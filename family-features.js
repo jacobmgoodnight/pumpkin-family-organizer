@@ -5,11 +5,12 @@ export function init({getClient,getOwner,bridge}){
  const make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el};
  const style=make("style");style.textContent=".pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 15px}.pf-actions button,.pf-panel button,.pf-modal button{cursor:pointer;background:#34483b;border:1px solid #70866c;color:#f2eee4;padding:9px 12px;border-radius:9px;font-weight:650}.pf-actions .pf-primary,.pf-modal button[type=submit],.pf-panel .pf-primary{background:#bb773e;color:#151d18;border-color:#e3ab73}.pf-panel{border:1px solid #58735e;border-radius:15px;background:#1a2b21;padding:15px;margin-bottom:16px}.pf-panel h3{margin:0 0 8px}.pf-panel a{color:#edb887}.pf-search{display:flex;gap:8px;flex-wrap:wrap}.pf-search input{flex:1;min-width:160px;background:#0f1b14;color:#fff;border:1px solid #6a826e;border-radius:9px;padding:10px}.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:13px}.pf-card{background:#263a2b;border:1px solid #526e57;border-radius:11px;padding:9px;min-width:0}.pf-card img{width:100%;height:150px;object-fit:contain;background:#101c14;border-radius:6px}.pf-card strong{display:block;font-size:13px;margin:6px 0;overflow-wrap:anywhere}.pf-card small{display:block;color:#bed0bc;margin:6px 0}.pf-card nav{display:flex;gap:5px;flex-wrap:wrap}.pf-card nav a,.pf-card nav button{font-size:12px;border:1px solid #65836b;color:#f9f2de;background:#354b3a;padding:7px;border-radius:6px;text-decoration:none}.pf-modal{border:1px solid #6c896c;border-radius:14px;background:#1d2c23;color:#f4ecdf;padding:20px;width:min(92vw,640px);max-height:85vh;overflow:auto}.pf-modal::backdrop{background:#000b}.pf-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pf-form label{display:grid;gap:5px;font-weight:600;font-size:13px}.pf-form input{background:#0c1912;border:1px solid #668369;border-radius:8px;color:white;padding:10px;min-width:0;width:100%;box-sizing:border-box}.pf-form .wide{grid-column:1/-1}.pf-note{font-size:13px;color:#ccdace;line-height:1.5}.pf-more{position:relative;align-self:center}.pf-more summary{cursor:pointer;color:#d5d8c7;padding:9px;border:1px solid #536f58;border-radius:8px;font-size:13px}.pf-more[open]{border:1px solid #526e57;background:#1a2b21;border-radius:9px;padding:5px}.pf-more button{margin:5px 5px 0 0}.pf-more summary::marker{color:#dfa878}@media(max-width:560px){.pf-form{grid-template-columns:1fr}.pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.append(style);
  const actions=make("div","pf-actions");
- const importBtn=make("button","pf-primary","＋ Import pattern"),webBtn=make("button","","🌐 Find more online"),ideasBtn=make("button","","♡ Saved web ideas"),manageBtn=make("button","","Manage imports"),helpBtn=make("button","","Help");
- const libraryTools=make("details","pf-more"),toolSummary=make("summary","","Library tools");
+ const importBtn=make("button","pf-primary","＋ Import"),webBtn=make("button","","🌐 Online designs"),ideasBtn=make("button","","♡ Saved web ideas"),manageBtn=make("button","","Manage imports"),helpBtn=make("button","","Help");
+ const libraryTools=make("details","pf-more"),toolSummary=make("summary","","Tools");
+ importBtn.title="Import a printable PDF or image";webBtn.title="Find more designs from Google Images";libraryTools.title="Saved web ideas, manage imports and help";
 libraryTools.append(toolSummary,ideasBtn,manageBtn,helpBtn);
 actions.append(importBtn,webBtn,libraryTools);
- (document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
+ (document.getElementById("tabs")||document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
  // Search all collections by default; curated Zombie Pumpkins still wins close relevance ties.
  const initialSource=$("source");if(initialSource&&initialSource.value==="zombie"){initialSource.value="";initialSource.dispatchEvent(new Event("change",{bubbles:true}));}
  const panel=make("section","pf-panel");panel.hidden=true;
@@ -421,7 +422,7 @@ actions.append(importBtn,webBtn,libraryTools);
        tags:r.tags||[],keywords:r.tags||[],difficulty:r.difficulty||"",thumbnail:links.get(r.thumbnail_path)||placeholder,
        path:links.get(r.original_path)||"",source:"family",pages:1,cloud_id:r.id
      })));
-     importBtn.textContent="＋ Import pattern";manageBtn.textContent="Manage imports"+(cloudRows.length?" ("+cloudRows.length+")":"");
+     importBtn.textContent="＋ Import";manageBtn.textContent="Manage imports"+(cloudRows.length?" ("+cloudRows.length+")":"");
    }catch(err){console.error("Could not load family imports",err);manageBtn.title="Could not refresh imports: "+err.message;}finally{loading=false;if(refreshQueued){refreshQueued=false;void refreshImports()}}
  }
  async function connect(){

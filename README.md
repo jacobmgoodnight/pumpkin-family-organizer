@@ -141,3 +141,10 @@ The organizer home screen now starts with **one prominent search box**, immediat
 The header distinguishes the **Organizer** (authenticated adult's Supabase account/email) from the **selected carver** (whose favorites are active). A **Share links** shortcut expands Family account settings → Share private family links, where an organizer can **Replace link** if an invitation is lost or already shared. Replacing a link revokes the previous one, because plaintext invite secrets are deliberately never stored in the database. The authenticated parent account, not the Jacob/Shelby/Charlotte/Violet selector, determines organizer privileges.
 
 This redesign changes markup and styling, **not the 2,053 catalog records, user profiles, RLS policies, or database**. Automated DOM/source regression tests cover the unique search input, progressive filters, link management and JavaScript syntax. Actual phone Safari layout and signed-in parent use still need human acceptance testing.
+
+
+### Compact iPhone layout refinement (October 29)
+
+Following direct feedback from iPhone screenshots, **Who’s picking a pumpkin? now appears above Find your pumpkin**. The sign-in area is condensed into a small organizer strip with a truncated parent email and an easily accessible **Links** button; the full email is retained in the account session, and **Family account settings** remains expandable. The top page heading is now **Pumpkin Organizer** rather than repeating the hero's “Find your pumpkin” title.
+
+On phones, the four browsing tabs occupy **one row** using shorter labels, **Import / Online designs / Tools** appear in a compact three-column actions row, and **Best match / Surprise / Clear** occupy a single row. The original standalone advanced-filter summary is visually suppressed: **More filters** beside the search box is the only on-screen filter disclosure, and the sticky-search Filters action continues to expand those original selectors. Importing, web suggestions, privacy, family selection data and the underlying search input remain unchanged. Real-device Safari layout still needs confirmation; source-level checks were added to CI.
