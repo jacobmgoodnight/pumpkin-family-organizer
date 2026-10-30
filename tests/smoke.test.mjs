@@ -243,7 +243,7 @@ test("Private family gallery starts with collapsed lineup and first-class person
  assert.match(guest,/getItems:\(\)=>catalog/);
  assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
- assert.match(page,/guest\.js\?v=20261030f/);
+ assert.match(page,/guest\.js\?v=20261030g/);
 });
 
 test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
@@ -314,8 +314,8 @@ test("Google discovery is a one-step inline search with collapsible results",()=
  assert.match(guest,/\$\("online-panel"\)\.hidden=!own/);
  assert.match(css,/\.online-results-panel/);
  assert.match(css,/\.online-discovery a:visited/);
- assert.match(page,/guest\.css\?v=20261030f/);
- assert.match(page,/guest\.js\?v=20261030f/);
+ assert.match(page,/guest\.css\?v=20261030g/);
+ assert.match(page,/guest\.js\?v=20261030g/);
 });
 
 test("Web ideas are explicitly preview-only, family imports are printable",()=>{
