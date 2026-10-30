@@ -358,32 +358,36 @@ function sourceLink(url,label){
  a.referrerPolicy="no-referrer";a.textContent=label;a.className="web-card-link";return a;
 }
 function renderLineup(){
- const wrap=$("lineup-section");wrap.replaceChildren();
- if(wrap.hidden)return;
- const head=document.createElement("div");head.className="lineup-head";
- const title=document.createElement("strong");title.textContent="Family favorites & final picks";
- head.append(title,button("Refresh",()=>refreshFamily()));wrap.append(head);
+ const wrap=$("lineup-section");wrap.replaceChildren();if(wrap.hidden)return;
+ const heading=document.createElement("div");heading.className="lineup-head";
+ const title=document.createElement("strong");title.textContent="Family pumpkin picks";
+ heading.append(title,button("Refresh",()=>refreshFamily(true)));wrap.append(heading);
  for(const person of people){
    const group=document.createElement("section");group.className="lineup-group";
    const name=document.createElement("strong");name.textContent=person.name+(person.id===me.personId?" · You":"");
-   group.append(name);
    const all=[...(familyChoices.get(person.id)||new Map())];
-   const favorites=all.filter(([,choice])=>choice.favorite);
-   const picks=all.filter(([,choice])=>choice.finalPick);
-   const line=(label,rows)=>{
-     const caption=document.createElement("small");caption.textContent=label+": "+rows.length;
-     const row=document.createElement("div");row.className="lineup-row";
-     if(!rows.length){const empty=document.createElement("span");empty.className="note";empty.textContent="Nothing selected yet";row.append(empty);}
-     for(const [id] of rows.slice(0,50)){
-       const item=library.get(id);if(!item)continue;
-       row.append(button(item.name,()=>{viewPersonSelection(person.id);openPreview(item);},"lineup-chip"));
-     }
-     group.append(caption,row);
-   };
-   line("Final picks",picks);
-   line("Favorites",favorites);
+   const picks=all.filter(([,v])=>v.finalPick),favs=all.filter(([,v])=>v.favorite&&!v.finalPick);
+   const label=document.createElement("p");label.className="lineup-count";
+   label.textContent=picks.length+" final picks · "+(picks.length+favs.length)+" favorites";
+   group.append(name,label);
+   const gallery=document.createElement("div");gallery.className="lineup-visual";
+   const ordered=[...picks,...favs].slice(0,8);
+   for(const [id,choice] of ordered){
+     const item=library.get(id);if(!item)continue;
+     const tile=document.createElement("div");tile.className="lineup-visual-item";
+     tile.append(createImage(item,()=>{viewPersonSelection(person.id);openPreview(item);}));
+     const desc=document.createElement("small");desc.textContent=(choice.finalPick?"🎃 ":"♥ ")+item.name;
+     tile.append(desc);gallery.append(tile);
+   }
+   if(!ordered.length){
+     const empty=document.createElement("p");empty.className="note";empty.textContent="No pumpkins chosen yet";gallery.append(empty);
+   }
+   group.append(gallery);
+   const see=button("See "+person.name+"'s saved pumpkins",()=>{viewPersonSelection(person.id);$("view-heading").scrollIntoView({behavior:"smooth",block:"start"});});
+   see.className="lineup-view-all";group.append(see);
    wrap.append(group);
  }
+ void images();
 }
 async function refreshFamily(){
  try{
