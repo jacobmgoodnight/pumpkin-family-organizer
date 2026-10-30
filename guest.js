@@ -586,7 +586,8 @@ async function searchOnline(term,reuse=true){
    $("online-status").textContent=onlineResults.length+" results · Recent search reused without spending credits";
    updateOnlineResultSummary();renderOnlineBatch();return;
  }
- onlinePending=true;$("online-status").textContent="Searching Google Images…";$("online-results").replaceChildren();$("online-more").hidden=true;
+ onlinePending=true;$("online-search-button").disabled=true;$("online-search-button").textContent="Searching…";$("browse-online").disabled=true;
+ $("online-status").textContent="Searching Google Images…";$("online-results").replaceChildren();$("online-more").hidden=true;
  try{
    const data=await api({action:"search",query:q});
    onlineResults=data.results||[];onlineShown=0;onlineCache.set(key,{time:Date.now(),results:onlineResults});
@@ -595,7 +596,7 @@ async function searchOnline(term,reuse=true){
    updateOnlineResultSummary();renderOnlineBatch();
  }catch(error){$("online-status").textContent="Unable to search: "+error.message+". You can still browse your existing catalog.";}
  
- finally{onlinePending=false;}
+ finally{onlinePending=false;$("online-search-button").disabled=false;$("online-search-button").textContent="Search images";$("browse-online").disabled=false;}
 }
 $("search").addEventListener("input",filter);
 for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
