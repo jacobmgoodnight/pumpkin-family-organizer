@@ -85,3 +85,9 @@ Your private link opens with **family picks collapsed**, so you can start browsi
 
 ### When using a private family invitation
 Choose your own name to browse the entire gallery and save your favorites and Final Picks. Choosing someone else's name now shows only **their saved favorites**; use **Final Picks** or **All saved** to change that shortlist, or tap **My pumpkins** to return to your own gallery. Other people's selections are always read-only. **Find more online** is a collapsible section below the gallery; opening it does not run a paid Google search. A newly saved Final Pick gets the pumpkin celebration after the server confirms it.
+
+
+### New: One-tap Google Images imports from private links
+After searching Google Images in **Find more online**, tap **Import to family** on a result. Confirm that you're allowed to save it, and the app attempts to download the original directly into the family's private storage—no phone download or manual JPG conversion. Once imported, the image appears under **Family imports** and can be opened/printed from the website. Some image websites block downloads, and the original might not be high enough resolution for a clean stencil; in that case, save the idea link instead and try another image or ask the organizer for a permitted file. A Google thumbnail alone is not a printable pattern.
+
+The family lineup now shows image thumbnails; search has more filters plus Surprise Me, and while the page is open it checks for other family selections roughly every 20 seconds. Tap the sync status to refresh manually. These features do not require children's email addresses.
