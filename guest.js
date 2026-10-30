@@ -1,65 +1,190 @@
-// One-profile guest portal. The bearer token is received in a URL fragment,
-// moved to tab-local sessionStorage, and never sent in a URL or to Google.
+// Invite-only family gallery. The token is a single-person bearer capability,
+// not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
 const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
 const $=id=>document.getElementById(id);
-const escaped=new URLSearchParams(location.hash.slice(1)).get("invite");
-if(escaped&&/^[A-Za-z0-9_-]{43}$/.test(escaped)){
- sessionStorage.setItem("pumpkin-person-invite",escaped);
+const hashToken=new URLSearchParams(location.hash.slice(1)).get("invite");
+if(hashToken&&/^[A-Za-z0-9_-]{43}$/.test(hashToken)){
+ sessionStorage.setItem("pumpkin-person-invite",hashToken);
  history.replaceState(null,"",location.pathname+location.search);
 }
 const token=sessionStorage.getItem("pumpkin-person-invite");
-let catalog=[],info=null,choices=new Map(),matches=[],visible=24,previewCache=new Map(),loadingImages=false;
-const notice=s=>{$("alert").textContent=s;};
+let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
+let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
+let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
+const notice=value=>{$("alert").textContent=value||"";};
+const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
+const button=(label,handler,cls="")=>{
+ const b=document.createElement("button");b.type="button";b.textContent=label;
+ if(cls)b.className=cls;
+ b.addEventListener("click",handler);return b;
+};
 const api=async body=>{
- const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","apikey":config?.publishableKey||"",},body:JSON.stringify({...body,token}),referrerPolicy:"no-referrer",cache:"no-store"});
+ const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","apikey":config?.publishableKey||""},
+   body:JSON.stringify({...body,token}),referrerPolicy:"no-referrer",cache:"no-store"});
  const data=await response.json().catch(()=>({error:"Connection unavailable"}));
  if(!response.ok||data.error)throw Error(data.error||"Connection unavailable");
  return data;
 };
-// Static catalog metadata contains names and source-path identifiers, NOT artwork.
 function normalize(v){return String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");}
-function prepare(){
- const additions=(info.imports||[]).map(x=>({
-   id:"family:"+x.id,name:x.name||"Family import",category:x.category||"Family imports",
-   source:"family",difficulty:x.difficulty||"",tags:x.tags||[],
-   thumbnail:x.thumbnail_path||x.original_path||"",importId:x.id
- }));
- catalog=[...catalog,...additions];
- for(const x of info.choices||[])choices.set(x.template_id,{favorite:!!x.favorite,finalPick:!!x.final_pick});
- $("greeting").textContent="Hi, "+info.name+"! 🎃";
- $("subtitle").textContent="Your private design shortlist · link expires "+new Date(info.expiresAt).toLocaleDateString();
- $("guest-app").hidden=false;filter();
+function stateFor(id,person=viewPerson){return familyChoices.get(person)?.get(id)||{favorite:false,finalPick:false};}
+function selectedIsMe(){return viewPerson===me?.personId;}
+function selectionCount(person=viewPerson){
+ const states=[...(familyChoices.get(person)?.values()||[])];
+ return {favorites:states.filter(x=>x.favorite).length,picks:states.filter(x=>x.finalPick).length};
+}
+function setFamilyData(data){
+ me=data;
+ people=Array.isArray(data.people)?data.people:[{id:data.personId,name:data.name}];
+ const newMap=new Map(people.map(p=>[p.id,new Map()]));
+ for(const c of data.familyChoices||[]){
+   if(newMap.has(c.personId))newMap.get(c.personId).set(c.templateId,{favorite:!!c.favorite,finalPick:!!c.finalPick});
+ }
+ // Backward-compatibility if a partially deployed backend returns only own picks.
+ if(!(data.familyChoices||[]).length){
+   for(const c of data.choices||[])newMap.get(data.personId)?.set(c.template_id,{favorite:!!c.favorite,finalPick:!!c.final_pick});
+ }
+ familyChoices=newMap;
+ if(!viewPerson||!newMap.has(viewPerson))viewPerson=data.personId;
+ const choices=$("person-view");choices.replaceChildren();
+ for(const person of people){
+   const option=document.createElement("option");option.value=person.id;
+   option.textContent=person.name+(person.id===data.personId?" (mine)":" · view only");
+   choices.append(option);
+ }
+ choices.value=viewPerson;
+ $("greeting").textContent="Hi, "+data.name+"! 🎃";
+ $("subtitle").textContent="Your family pumpkin gallery · link expires "+new Date(data.expiresAt).toLocaleDateString();
+ $("guest-app").hidden=false;
+}
+function prepareImports(rows){
+ catalog=catalog.filter(x=>x.source!=="family");
+ for(const x of rows||[]){
+   catalog.push({id:"family:"+x.id,name:x.name||"Family import",category:x.category||"Family imports",
+     source:"family",difficulty:x.difficulty||"",tags:x.tags||[],thumbnail:x.thumbnail_path||x.original_path||"",importId:x.id});
+ }
+ library=new Map(catalog.map(x=>[x.id,x]));
 }
 function filter(){
- const q=normalize($("search").value.trim());
- const collection=$("filter").value;
- matches=catalog.filter(x=>{
-   const state=choices.get(x.id)||{};
-   if(collection==="zombie"&&x.source!=="zombie")return false;
-   if(collection==="family"&&x.source!=="family")return false;
-   if(collection==="favorite"&&!state.favorite)return false;
-   if(collection==="picked"&&!state.finalPick)return false;
-   return !q||normalize([x.name,x.category,...(x.tags||[])].join(" ")).includes(q);
+ const q=normalize($("search").value.trim()),kind=$("filter").value;
+ matches=catalog.filter(item=>{
+   const s=stateFor(item.id);
+   if(kind==="zombie"&&item.source!=="zombie")return false;
+   if(kind==="family"&&item.source!=="family")return false;
+   if(kind==="favorite"&&!s.favorite)return false;
+   if(kind==="picked"&&!s.finalPick)return false;
+   return !q||normalize([item.name,item.category,...(item.tags||[])].join(" ")).includes(q);
  });
  matches.sort((a,b)=>(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
  visible=24;render();
 }
-function button(text,pressed,onClick){
- const b=document.createElement("button");b.type="button";b.textContent=text;b.setAttribute("aria-pressed",String(!!pressed));b.addEventListener("click",onClick);return b;
+function createImage(item,click){
+ const control=button("",click,"image-open");control.setAttribute("aria-label","Enlarge "+item.name);
+ const img=document.createElement("img");img.loading="lazy";img.alt=item.name+" carving preview";
+ if(item.thumbnail){img.dataset.preview=item.thumbnail;const cached=previewCache.get(item.thumbnail);if(cached&&cached.expires>Date.now())img.src=cached.url;}
+ else img.src="app-icon.svg";
+ control.append(img);return control;
 }
-async function choose(item,field){
- const current=choices.get(item.id)||{favorite:false,finalPick:false};
- const next={...current};
- next[field]=!next[field];
+async function saveChoice(item,field){
+ if(!selectedIsMe()){notice("This is another person's list. You can view and compare, but not change their picks.");return;}
+ const person=me.personId,map=familyChoices.get(person);
+ const before=stateFor(item.id,person),next={...before,[field]:!before[field]};
  if(field==="favorite"&&!next.favorite)next.finalPick=false;
  if(field==="finalPick"&&next.finalPick)next.favorite=true;
- choices.set(item.id,next);render();
+ map.set(item.id,next);render();refreshModal();
  try{
-   const result=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
-   choices.set(item.id,{favorite:result.favorite,finalPick:result.finalPick});notice("");
- }catch(error){choices.set(item.id,current);notice("Selection not saved: "+error.message);}
+   const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
+   map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
+   notice("");
+ }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
+ render();refreshModal();
+}
+function addCompare(item){
+ if(compareIds.has(item.id))compareIds.delete(item.id);
+ else if(compareIds.size<3)compareIds.add(item.id);
+ else{notice("Compare up to three designs. Remove one first.");return;}
+ updateCompare();
  render();
+ refreshModal();
+}
+function updateCompare(){
+ $("compare-count").textContent=String(compareIds.size);
+ $("compare-open").disabled=compareIds.size<2;
+}
+function actionButton(item,field){
+ const state=stateFor(item.id),own=selectedIsMe();
+ const text=field==="favorite"?(state.favorite?"♥ Saved":"♡ Save"):(state.finalPick?"🎃 Picked":"🎃 Pick");
+ const b=button(text,()=>saveChoice(item,field));
+ b.disabled=!own;b.setAttribute("aria-pressed",String(field==="favorite"?state.favorite:state.finalPick));
+ b.title=own?text:"Read-only: "+people.find(x=>x.id===viewPerson)?.name+"'s selections";return b;
+}
+function itemActions(item){
+ const actions=document.createElement("div");actions.className="actions";
+ if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
+ else{
+   const state=stateFor(item.id),read=document.createElement("small");
+   read.textContent=state.finalPick?"✓ Their final pick":state.favorite?"♥ Their favorite":"Read only";
+   actions.append(read);
+ }
+ return actions;
+}
+function render(){
+ const host=$("grid");host.replaceChildren();
+ for(const item of matches.slice(0,visible)){
+   const card=document.createElement("article");card.className="card";
+   card.append(createImage(item,()=>openPreview(item)));
+   const area=document.createElement("div");area.className="content";
+   const title=document.createElement("strong");title.textContent=item.name;
+   const category=document.createElement("small");category.textContent=item.category+(item.difficulty?" · "+item.difficulty:"");
+   area.append(title,category,itemActions(item));
+   const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
+   compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
+   area.append(compare);
+   if(item.importId)area.append(button("Open printable ↗",()=>printable(item),"print"));
+   card.append(area);host.append(card);
+ }
+ $("more").hidden=matches.length<=visible;
+ $("more").textContent="Show more designs ("+Math.min(24,matches.length-visible)+" next)";
+ $("count").textContent=matches.length+" matching designs";
+ const counts=selectionCount(),person=people.find(x=>x.id===viewPerson);
+ $("totals").textContent=(person?.name||"Family")+": "+counts.favorites+" favorites · "+counts.picks+" final picks";
+ $("read-only").hidden=selectedIsMe();
+ void images();
+}
+function attachDialogClose(dialog,buttonId){
+ $(buttonId).addEventListener("click",()=>dialog.close());
+ dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
+}
+let openedItem=null;
+function openPreview(item){openedItem=item;refreshModal();$("preview-dialog").showModal();void images();}
+function refreshModal(){
+ if(!openedItem||!$("preview-dialog").open)return;
+ const item=openedItem;$("preview-title").textContent=item.name;
+ const image=$("preview-image"),cached=previewCache.get(item.thumbnail);
+ image.alt="Enlarged "+item.name;
+ image.src=cached?.expires>Date.now()?cached.url:"app-icon.svg";
+ if(item.thumbnail&&!cached)void images();
+ $("preview-description").textContent=[item.category,item.difficulty,item.source==="family"?"Family import":"Built-in design"].filter(Boolean).join(" · ");
+ const actions=$("preview-actions");actions.replaceChildren();
+ if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
+ actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
+ if(item.importId)actions.append(button("Open printable ↗",()=>printable(item)));
+ else{const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
+}
+function showCompare(){
+ const host=$("compare-grid");host.replaceChildren();
+ for(const id of compareIds){
+   const item=library.get(id);if(!item)continue;
+   const card=document.createElement("div");card.className="compare-item";
+   card.append(createImage(item,()=>openPreview(item)));
+   const title=document.createElement("strong");title.textContent=item.name;card.append(title);
+   card.append(itemActions(item));
+   card.append(button("Remove",()=>{compareIds.delete(id);updateCompare();showCompare();render();}));
+   host.append(card);
+ }
+ if(compareIds.size<2){$("compare-dialog").close();return;}
+ $("compare-dialog").showModal?.();
+ void images();
 }
 async function printable(item){
  if(!item.importId)return;
@@ -71,63 +196,141 @@ async function printable(item){
  }catch(error){if(popup)popup.close();notice(error.message);}
 }
 async function images(){
- if(loadingImages)return;
- const pictures=[...document.querySelectorAll("img[data-preview]")].filter(x=>!x.src||x.dataset.loading!=="yes");
- const unknown=[...new Set(pictures.map(x=>x.dataset.preview))].filter(x=>x&&!previewCache.has(x)).slice(0,60);
- for(const img of pictures){if(previewCache.has(img.dataset.preview)){img.src=previewCache.get(img.dataset.preview);img.dataset.loading="yes";}}
+ if(loadingImages){imagesQueued=true;return;}
+ const pictures=[...document.querySelectorAll("img[data-preview]")];
+ const now=Date.now();
+ for(const image of pictures){
+   const value=previewCache.get(image.dataset.preview);
+   if(value?.expires>now){if(image.src!==value.url)image.src=value.url;}
+ }
+ const unknown=[...new Set(pictures.map(image=>image.dataset.preview))]
+   .filter(x=>x&&(!previewCache.has(x)||previewCache.get(x).expires<=now)).slice(0,60);
  if(!unknown.length)return;
  loadingImages=true;
  try{
    const {links}=await api({action:"thumbs",paths:unknown});
-   for(const [path,url] of Object.entries(links||{}))previewCache.set(path,url);
-   for(const img of document.querySelectorAll("img[data-preview]")){
-     if(previewCache.has(img.dataset.preview)){img.src=previewCache.get(img.dataset.preview);img.dataset.loading="yes";}
+   const expiry=Date.now()+15*60*1000;
+   for(const path of unknown)previewCache.set(path,{url:links?.[path]||"",expires:links?.[path]?expiry:Date.now()+60000});
+   for(const image of document.querySelectorAll("img[data-preview]")){
+     const value=previewCache.get(image.dataset.preview);
+     if(value?.url&&value.expires>Date.now())image.src=value.url;
    }
- }catch(error){notice("Artwork previews unavailable: "+error.message);}
- finally{loadingImages=false;}
-}
-function render(){
- const host=$("grid");host.replaceChildren();
- for(const item of matches.slice(0,visible)){
-   const card=document.createElement("article");card.className="card";
-   const image=document.createElement("img");image.alt=item.name+" pumpkin preview";image.loading="lazy";image.dataset.preview=item.thumbnail;
-   const area=document.createElement("div");area.className="content";
-   const title=document.createElement("strong");title.textContent=item.name;
-   const category=document.createElement("small");category.textContent=item.category+(item.difficulty?" · "+item.difficulty:"");
-   const actions=document.createElement("div");actions.className="actions";
-   const state=choices.get(item.id)||{};
-   const heart=button(state.favorite?"♥ Saved":"♡ Save",state.favorite,()=>choose(item,"favorite"));
-   const pick=button(state.finalPick?"🎃 Picked":"🎃 Pick",state.finalPick,()=>choose(item,"finalPick"));
-   actions.append(heart,pick);area.append(title,category,actions);
-   if(item.importId){
-     const p=button("Open printable ↗",false,()=>printable(item));p.className="print";area.append(p);
-   }
-   card.append(image,area);host.append(card);
+   if(openedItem&&$("preview-dialog").open)refreshModal();
+ }catch(error){notice("Could not load artwork: "+error.message);}
+ finally{
+   loadingImages=false;
+   if(imagesQueued){imagesQueued=false;void images();}
  }
- $("more").hidden=matches.length<=visible;
- $("more").textContent="Show more designs ("+Math.min(24,matches.length-visible)+" next)";
- $("count").textContent=matches.length+" matching designs";
- const states=[...choices.values()];
- $("totals").textContent=states.filter(x=>x.favorite).length+" favorites · "+states.filter(x=>x.finalPick).length+" final picks";
- void images();
+}
+function renderLineup(){
+ const wrap=$("lineup-section");wrap.replaceChildren();
+ if(wrap.hidden)return;
+ const head=document.createElement("div");head.className="lineup-head";
+ const title=document.createElement("strong");title.textContent="Family favorites & final picks";
+ head.append(title,button("Refresh",()=>refreshFamily()));wrap.append(head);
+ for(const person of people){
+   const group=document.createElement("section");group.className="lineup-group";
+   const name=document.createElement("strong");name.textContent=person.name+(person.id===me.personId?" · You":"");
+   group.append(name);
+   const favorites=[...(familyChoices.get(person.id)||new Map())].filter(([,choice])=>choice.favorite);
+   const picks=favorites.filter(([,choice])=>choice.finalPick);
+   const line=(label,rows)=>{
+     const caption=document.createElement("small");caption.textContent=label+": "+rows.length;
+     const row=document.createElement("div");row.className="lineup-row";
+     if(!rows.length){const empty=document.createElement("span");empty.className="note";empty.textContent="Nothing selected yet";row.append(empty);}
+     for(const [id] of rows.slice(0,50)){
+       const item=library.get(id);if(!item)continue;
+       row.append(button(item.name,()=>{viewPerson=person.id;$("person-view").value=person.id;filter();openPreview(item);},"lineup-chip"));
+     }
+     group.append(caption,row);
+   };
+   line("Final picks",picks);
+   line("Favorites",favorites);
+   wrap.append(group);
+ }
+}
+async function refreshFamily(){
+ try{
+   const updated=await api({action:"guest"});
+   setFamilyData(updated);prepareImports(updated.imports);
+   filter();renderLineup();notice("");
+ }catch(error){notice("Could not refresh family selections: "+error.message);}
+}
+function renderOnlineBatch(){
+ const host=$("online-results");
+ for(const row of onlineResults.slice(onlineShown,onlineShown+12)){
+   const thumb=safeUrl(row.thumbnail),src=safeUrl(row.sourceUrl);
+   if(!thumb||!src)continue;
+   const card=document.createElement("article");card.className="card";
+   const img=document.createElement("img");img.src=thumb;img.loading="lazy";img.alt=row.title||"Pumpkin design idea";
+   const area=document.createElement("div");area.className="content";
+   const title=document.createElement("strong");title.textContent=row.title||"Printable carving idea";
+   const label=document.createElement("small");label.textContent=row.source||"External website";
+   const link=document.createElement("a");link.className="web-card-link";link.href=src;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Open original source ↗";
+   const share=button("Share idea",async()=>{
+     try{
+       if(navigator.share)await navigator.share({title:row.title||"Pumpkin pattern",url:src});
+       else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(src);notice("Source link copied. Send it to the organizer for an authorized import.");}
+       else notice("Open the source and copy its address to share.");
+     }catch(error){if(error.name!=="AbortError")notice("Sharing unavailable; open the source instead.");}
+   });
+   area.append(title,label,link,share);card.append(img,area);host.append(card);
+ }
+ onlineShown=Math.min(onlineResults.length,onlineShown+12);
+ $("online-more").hidden=onlineShown>=onlineResults.length;
+ $("online-more").textContent="Show more images ("+(onlineResults.length-onlineShown)+" remaining)";
+}
+async function searchOnline(term,reuse=true){
+ const q=term.trim();if(q.length<2){$("online-status").textContent="Enter at least 2 letters.";return;}
+ if(onlinePending)return;
+ const key=normalize(q);onlineQuery=q;
+ const cache=onlineCache.get(key);
+ if(reuse&&cache&&Date.now()-cache.time<15*60*1000){
+   onlineResults=cache.results;onlineShown=0;$("online-results").replaceChildren();
+   $("online-status").textContent=onlineResults.length+" results · Recent search reused without spending credits";
+   renderOnlineBatch();return;
+ }
+ onlinePending=true;$("online-status").textContent="Searching Google Images…";$("online-results").replaceChildren();$("online-more").hidden=true;
+ try{
+   const data=await api({action:"search",query:q});
+   onlineResults=data.results||[];onlineShown=0;onlineCache.set(key,{time:Date.now(),results:onlineResults});
+   if(onlineCache.size>12)onlineCache.delete(onlineCache.keys().next().value);
+   $("online-status").textContent=onlineResults.length+" image ideas · Original sources may have usage restrictions. Online searches share the family's 15/hour, 40/day limits.";
+   renderOnlineBatch();
+ }catch(error){$("online-status").textContent="Unable to search: "+error.message+". You can still browse your existing catalog.";}
+ finally{onlinePending=false;}
+}
+function openOnline(){
+ const section=$("online-panel");
+ section.hidden=false;$("online-search").value=$("search").value.trim()||$("online-search").value;
+ section.scrollIntoView({behavior:"smooth",block:"nearest"});
+ if($("online-search").value.trim().length>=2)void searchOnline($("online-search").value);
+ else $("online-status").textContent="Enter a design or character to find Google Images suggestions.";
 }
 $("search").addEventListener("input",filter);
 $("filter").addEventListener("change",filter);
+$("person-view").addEventListener("change",()=>{viewPerson=$("person-view").value;compareIds.clear();updateCompare();filter();refreshModal();});
 $("more").addEventListener("click",()=>{visible+=24;render();});
+$("compare-open").addEventListener("click",showCompare);
+$("family-lineup").addEventListener("click",()=>{$("lineup-section").hidden=!$("lineup-section").hidden;renderLineup();});
+$("online-open").addEventListener("click",openOnline);
+$("online-close").addEventListener("click",()=>{$("online-panel").hidden=true;});
+$("online-form").addEventListener("submit",event=>{event.preventDefault();void searchOnline($("online-search").value,false);});
+$("online-more").addEventListener("click",renderOnlineBatch);
 $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-person-invite");location.href="./";});
+attachDialogClose($("preview-dialog"),"preview-close");
+attachDialogClose($("compare-dialog"),"compare-close");
+window.addEventListener("focus",()=>{if(me)void refreshFamily();});
 async function start(){
- if(!token){notice("No invitation was found. Ask the organizer to share your private link again.");return;}
+ if(!token){notice("No invitation found. Ask the organizer to share your private link again.");return;}
  if(!config?.url||!config?.publishableKey){notice("Private gallery configuration is unavailable.");return;}
  try{
-   notice("Opening your private invitation…");
-   const results=await Promise.all([
+   notice("Opening your private family gallery…");
+   const [items,data]=await Promise.all([
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
-   catalog=results[0];info=results[1];notice("");prepare();
- }catch(error){
-   notice(error.message+". Ask the organizer for a new link if yours has expired or been revoked.");
-   sessionStorage.removeItem("pumpkin-person-invite");
- }
+   catalog=items;setFamilyData(data);prepareImports(data.imports);notice("");filter();
+ }catch(error){notice(error.message+". Ask the organizer for a new link if yours expired or was revoked.");sessionStorage.removeItem("pumpkin-person-invite");}
 }
 void start();
