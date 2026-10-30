@@ -2,7 +2,7 @@
  * Suggestions stay attached to the input, rather than fixed to the viewport:
  * mobile Safari's keyboard changes the visual viewport independently of innerHeight.
  */
-export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-suggestions"}){
+export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-suggestions",dismissOnChoose=false}){
  const fields=inputs.filter(Boolean);
  if(!fields.length||typeof getItems!=="function")return {hide(){}};
  const panel=document.createElement("div");
@@ -106,7 +106,7 @@ export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-sugges
    if(!choice||!input)return;
    hide();ignore=true;input.value=choice.value;
    input.dispatchEvent(new Event("input",{bubbles:true}));ignore=false;
-   input.focus();
+   if(dismissOnChoose)input.blur();else input.focus();
  }
  function selectRow(){
    panel.querySelectorAll('button').forEach((b,i)=>b.setAttribute("aria-selected",String(i===highlight)));
