@@ -109,7 +109,7 @@ test("Guest links use scoped server auth and catalog metadata only",()=>{
  assert.match(edge,/TOKEN\.test\(token\)/);
  const recovery=file("guest-access.js");
  assert.match(recovery,/store\(getSession,"setItem",SESSION_KEY/);
- assert.match(recovery,/store\(getPersistent,"setItem",REMEMBER_KEY/);
+ assert.match(recovery,/target\.setItem\(REMEMBER_KEY,data\)/);
  assert.match(guest,/history\.replaceState/);
  assert.match(guest,/"apikey":config\?\.publishableKey/);
  assert.match(page,/cloud-config\.js/);
