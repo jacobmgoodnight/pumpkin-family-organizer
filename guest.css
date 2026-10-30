@@ -24,3 +24,23 @@
  .online-panel{padding:9px}
 }
 @media(max-width:380px){.lineup{grid-template-columns:1fr}}
+
+
+/* Private link parity: one-tap personal library, not organizer-only controls. */
+.guest-views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:8px 0 12px}
+.guest-views button{border:1px solid #617b66;background:#263b2d;color:#f5ecd9;min-width:0;min-height:44px;border-radius:9px;padding:8px;font-weight:700;font-size:13px;cursor:pointer}
+.guest-views button[aria-pressed=true]{background:#e5a96b;color:#19261c;border-color:#f6c894}
+.guest-views span{display:inline-block;background:#3c5545;color:#f4eee3;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px;min-width:21px}
+.guest-views button[aria-pressed=true] span{background:#6c5234;color:#fff}
+.guest-empty{border:1px dashed #789179;border-radius:12px;text-align:center;padding:22px 12px;margin:12px 0}
+.guest-empty button{border:1px solid #d4aa70;border-radius:9px;background:#344b39;color:#f5eee4;padding:10px 14px;min-height:44px}
+.toolbar .search{position:relative;overflow:visible}
+#guest-search-suggestions{max-width:100%;box-shadow:0 12px 26px #000b}
+@media(max-width:600px){
+ .guest-views{gap:5px;margin:7px 0}
+ .guest-views button{font-size:12px;line-height:1.25;padding:7px 4px;min-height:45px}
+ .guest-views span{margin-left:2px;font-size:10px;padding:2px 4px}
+ .lineup{margin-top:7px}
+ .catalog-heading{margin:12px 0 3px}
+ .summary{margin:8px 0}
+}

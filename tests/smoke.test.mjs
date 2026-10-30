@@ -205,7 +205,7 @@ test("Participant web ideas are saved through the scoped invitation API",()=>{
  assert.match(page,/<option value="web">Saved online ideas<\/option>/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('class="catalog-heading"'));
  assert.ok(page.indexOf('id="online-panel"')>page.indexOf('id="grid"'));
- assert.match(page,/id="family-lineup"[^>]+aria-expanded="true"/);
+ assert.match(page,/id="family-lineup"[^>]+aria-expanded="false"/);
 });
 test("Participant search preserves exact match priority over curated tie preference",()=>{
  const guest=file("guest.js");
@@ -224,4 +224,37 @@ test("Small phones keep sort, Surprise Me and clear controls in separate cells",
  assert.match(css,/\.toolbar-tail #surprise\{[\s\S]*?grid-column:1!important/);
  assert.match(guestCss,/@media\(max-width:600px\)/);
  assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+});
+
+test("Private family gallery starts with collapsed lineup and first-class personal tabs",()=>{
+ const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
+ assert.match(page,/id="family-lineup"[^>]*aria-expanded="false"/);
+ assert.match(page,/id="lineup-section"[^>]*hidden/);
+ assert.match(page,/id="quick-all"/);
+ assert.match(page,/id="quick-favorites"/);
+ assert.match(page,/id="quick-picks"/);
+ assert.match(page,/id="quick-favorites-count"/);
+ assert.match(page,/id="quick-picks-count"/);
+ assert.match(guest,/function selectQuickView\(kind\)/);
+ assert.match(guest,/viewPerson=me\.personId/);
+ assert.match(guest,/\$\("search"\)\.value=""/);
+ assert.match(guest,/function updateQuickViews/);
+ assert.match(guest,/mountSmartSuggestions\(/);
+ assert.match(guest,/getItems:\(\)=>catalog/);
+ assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
+ assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
+ assert.match(page,/guest\.js\?v=20261030b/);
+});
+
+test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
+ const smart=file("search-suggestions.js"),guest=file("guest.js");
+ assert.match(smart,/export function mountSmartSuggestions/);
+ assert.match(smart,/function position\(el\)/);
+ assert.match(smart,/panel\.parentElement!==host/);
+ assert.match(smart,/window\.visualViewport/);
+ assert.match(smart,/if\(room<92\|\|r\.top<visibleTop/);
+ assert.match(smart,/const limit=q\.length>=7\?2:1/);
+ assert.match(smart,/title\.source==="zombie"\?3:0/);
+ assert.doesNotMatch(smart,/position:fixed/);
+ assert.match(guest,/import \{mountSmartSuggestions\} from/);
 });
