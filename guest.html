@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030b">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030c">
 </head><body>
 <header><div class="container head">
  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Your pumpkin designs</h1><p id="subtitle">Opening your private invitation…</p></div>
@@ -13,23 +13,31 @@
  <p id="alert" role="status" aria-live="polite"></p>
  <section id="guest-app" hidden>
   <div class="guest-person">
-   <label for="person-view">Whose designs are you viewing?</label>
+   <label for="person-view">Who’s picking a pumpkin?</label>
    <select id="person-view" aria-label="Choose a family member to view"></select>
    <span id="read-only" class="read-only" hidden>Viewing only · changes are disabled for other people</span>
   </div>
   <nav class="guest-nav" aria-label="Family library actions">
    <button id="family-lineup" type="button" aria-expanded="false">👨‍👩‍👧‍👧 Show family picks</button>
    <button id="compare-open" type="button" disabled>Compare <span id="compare-count">0</span>/3</button>
-   <button id="online-open" type="button">🌐 Find more online</button>
   </nav>
   <section id="lineup-section" class="lineup" hidden aria-label="Family favorites and picks"></section>
   <h2 id="view-heading" class="catalog-heading">Find your pumpkin</h2>
-  <nav class="guest-views" aria-label="Your pumpkin views">
+  <section id="other-person-banner" class="other-person-banner" hidden aria-live="polite">
+   <div class="other-person-heading"><div><strong id="other-person-title"></strong><p id="other-person-description"></p></div>
+    <button id="back-to-me" type="button">My pumpkins</button></div>
+   <nav class="other-person-tabs" aria-label="View this person's saved pumpkins">
+    <button id="other-favorites" type="button" aria-pressed="true">♥ Favorites</button>
+    <button id="other-picks" type="button" aria-pressed="false">✓ Final picks</button>
+    <button id="other-saved" type="button" aria-pressed="false">All saved</button>
+   </nav>
+  </section>
+  <nav id="guest-views" class="guest-views" aria-label="Your pumpkin views">
    <button id="quick-all" type="button" aria-pressed="true">All designs</button>
    <button id="quick-favorites" type="button" aria-pressed="false">♥ My favorites <span id="quick-favorites-count">0</span></button>
    <button id="quick-picks" type="button" aria-pressed="false">✓ My picks <span id="quick-picks-count">0</span></button>
   </nav>
-  <div class="toolbar">
+  <div id="browse-toolbar" class="toolbar">
    <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off"></label>
    <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option><option value="web">Saved online ideas</option></select></label>
   </div>
@@ -40,8 +48,12 @@
    <button id="empty-reset" type="button">Browse all designs</button>
   </div>
   <button id="more" class="more" hidden>Show more designs</button>
-  <section id="online-panel" class="online-panel" hidden>
-   <div class="panel-heading"><h2>Find more online</h2><button id="online-close" type="button" aria-label="Close online results">✕</button></div>
+  <details id="online-panel" class="online-panel online-discovery">
+   <summary class="online-discovery-summary">
+    <span class="online-discovery-icon" aria-hidden="true">🌐</span>
+    <span class="online-discovery-label"><strong>Find more online</strong><small>Can't find your pumpkin? Search Google Images for more stencil ideas.</small></span>
+    <span class="online-discovery-chevron" aria-hidden="true">⌄</span>
+   </summary><div class="online-discovery-content">
    <form id="online-form" class="online-form">
      <label for="online-search">Search Google Images</label><input id="online-search" type="search" placeholder="Minecraft pumpkin stencil…" required minlength="2">
      <button type="submit">Search images</button>
@@ -49,7 +61,8 @@
    <p class="note" id="online-status" role="status">Results are suggestions from external websites. Open the source before using a design.</p>
    <div id="online-results" class="cards web-results"></div>
    <button id="online-more" class="more" hidden>Show more images</button>
-  </section>
+   </div>
+  </details>
   <p class="note">Your link saves your own favorites and picks. Saved web ideas are shared as source links, not printable files; the organizer can import authorized originals. Built-in originals remain on the organizer’s computer.</p>
   <button id="forget" class="quiet danger">Forget private link on this device</button>
  </section>
@@ -64,5 +77,11 @@
  <div class="dialog-head"><h2 id="compare-title">Compare pumpkin designs</h2><button id="compare-close" type="button" aria-label="Close comparison">✕</button></div>
  <div id="compare-grid" class="compare-grid"></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030b"></script>
+<dialog id="celebrate-dialog" class="celebrate-dialog" aria-labelledby="celebrate-heading" aria-describedby="celebrate-design">
+ <div class="celebrate-emojis" aria-hidden="true"><span>🎃</span><span>✨</span><span>🎃</span><span>🧡</span><span>🎃</span><span>⭐</span><span>🎃</span><span>✨</span><span>🎃</span></div>
+ <div class="celebrate-content"><div class="celebrate-hero" aria-hidden="true">🎃</div>
+ <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
+ <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
+</dialog>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030c"></script>
 </body></html>
