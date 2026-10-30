@@ -143,3 +143,6 @@
 }
 @media(max-width:380px){.lineup-visual{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.lineup-visual-item *{transition:none!important}}
+
+/* Saved search ideas do not pretend to be print-ready family files. */
+.idea-only-marker{display:block;border:1px solid #667f6c;background:#263b30;border-radius:7px;padding:6px;color:#f1d0a0!important;font-size:11px!important;font-weight:650}
