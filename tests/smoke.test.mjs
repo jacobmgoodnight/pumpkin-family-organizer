@@ -198,7 +198,7 @@ test("Participant web ideas are saved through the scoped invitation API",()=>{
  assert.match(edge,/ideas:ideas\.data\|\|\[\]/);
  assert.match(edge,/\.eq\("token_hash",tokenHash\)/);
  assert.match(guest,/async function saveOnlineIdea/);
- assert.match(guest,/api\(\{action:"choice",templateId:item\.id,favorite:true,finalPick:false\}\)/);
+ assert.match(guest,/api\(\{action:"choice",templateId:item\.id,favorite:true,finalPick:!!prior\.finalPick\}\)/);
  assert.match(guest,/function openOnlinePreview/);
  assert.match(guest,/function prepareIdeas/);
  assert.match(guest,/if\(compare\)addCompare\(item\)/);
