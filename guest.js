@@ -297,6 +297,51 @@ async function refreshFamily(){
    filter();renderLineup();notice("");
  }catch(error){notice("Could not refresh family selections: "+error.message);}
 }
+async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
+ const sourceUrl=safeUrl(row.sourceUrl);
+ if(!sourceUrl)throw Error("This image has no usable source link.");
+ const {idea}=await api({action:"idea",title:row.title||"Pumpkin design idea",
+   sourceUrl,thumbnail:safeUrl(row.thumbnail),source:row.source||"Website",searchTerm:onlineQuery});
+ if(!idea?.id)throw Error("Could not save this idea");
+ const index=savedIdeas.findIndex(x=>x.id===idea.id);
+ if(index<0)savedIdeas.unshift(idea);else savedIdeas[index]=idea;
+ prepareIdeas(savedIdeas);
+ const item=library.get("web:"+idea.id);
+ if(favorite){
+   const response=await api({action:"choice",templateId:item.id,favorite:true,finalPick:false});
+   familyChoices.get(me.personId).set(item.id,{favorite:!!response.favorite,finalPick:!!response.finalPick});
+ }
+ if(compare)addCompare(item);
+ filter();renderLineup();
+ notice("Saved to family ideas"+(favorite?" and your favorites":"")+". Ask the organizer to import an authorized printable.");
+ return item;
+}
+function openOnlinePreview(row){
+ openedItem=null;
+ const dialog=$("preview-dialog");
+ if($("compare-dialog").open)$("compare-dialog").close();
+ $("preview-title").textContent=row.title||"Pumpkin design idea";
+ const image=$("preview-image");
+ image.removeAttribute("data-preview");image.referrerPolicy="no-referrer";
+ image.alt=row.title||"Online pumpkin design";image.src=safeUrl(row.originalImageUrl)||safeUrl(row.thumbnail)||"app-icon.svg";
+ $("preview-description").textContent="Online image · "+(row.source||"External source")+" · Preview only until a printable is imported";
+ const actions=$("preview-actions");actions.replaceChildren();
+ const save=button("♥ Save & favorite",async()=>{
+   save.disabled=true;
+   try{const item=await saveOnlineIdea(row,{favorite:true});openPreview(item);}
+   catch(error){notice("Could not save idea: "+error.message);}
+   finally{save.disabled=false;}
+ });
+ const compare=button("Save & compare",async()=>{
+   compare.disabled=true;
+   try{const item=await saveOnlineIdea(row,{compare:true});openPreview(item);}
+   catch(error){notice("Could not save idea: "+error.message);}
+   finally{compare.disabled=false;}
+ });
+ actions.append(save,compare);
+ if(safeUrl(row.sourceUrl))actions.append(sourceLink(safeUrl(row.sourceUrl),"View original source ↗"));
+ if(!dialog.open)dialog.showModal();
+}
 function renderOnlineBatch(){
  const host=$("online-results");
  for(const row of onlineResults.slice(onlineShown,onlineShown+12)){
@@ -304,10 +349,14 @@ function renderOnlineBatch(){
    if(!thumb||!src)continue;
    const card=document.createElement("article");card.className="card";
    const img=document.createElement("img");img.src=thumb;img.loading="lazy";img.alt=row.title||"Pumpkin design idea";
+   img.referrerPolicy="no-referrer";
+   const preview=button("",()=>openOnlinePreview(row),"image-open");
+   preview.setAttribute("aria-label","Preview "+(row.title||"online pumpkin idea"));
+   preview.append(img);
    const area=document.createElement("div");area.className="content";
    const title=document.createElement("strong");title.textContent=row.title||"Printable carving idea";
    const label=document.createElement("small");label.textContent=row.source||"External website";
-   const link=document.createElement("a");link.className="web-card-link";link.href=src;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Open original source ↗";
+   const link=sourceLink(src,"Open original source ↗");
    const share=button("Share idea",async()=>{
      try{
        if(navigator.share)await navigator.share({title:row.title||"Pumpkin pattern",url:src});
@@ -315,7 +364,12 @@ function renderOnlineBatch(){
        else notice("Open the source and copy its address to share.");
      }catch(error){if(error.name!=="AbortError")notice("Sharing unavailable; open the source instead.");}
    });
-   area.append(title,label,link,share);card.append(img,area);host.append(card);
+   const save=button("♥ Save & favorite",async()=>{
+     save.disabled=true;
+     try{await saveOnlineIdea(row,{favorite:true});save.textContent="✓ Saved & favorited";}
+     catch(error){notice("Could not save idea: "+error.message);save.disabled=false;}
+   },"web-save");
+   area.append(title,label,save,link,share);card.append(preview,area);host.append(card);
  }
  onlineShown=Math.min(onlineResults.length,onlineShown+12);
  $("online-more").hidden=onlineShown>=onlineResults.length;
@@ -353,7 +407,12 @@ $("filter").addEventListener("change",filter);
 $("person-view").addEventListener("change",()=>{viewPerson=$("person-view").value;compareIds.clear();updateCompare();filter();refreshModal();});
 $("more").addEventListener("click",()=>{visible+=24;render();});
 $("compare-open").addEventListener("click",showCompare);
-$("family-lineup").addEventListener("click",()=>{$("lineup-section").hidden=!$("lineup-section").hidden;renderLineup();});
+$("family-lineup").addEventListener("click",()=>{
+ const section=$("lineup-section");section.hidden=!section.hidden;
+ $("family-lineup").textContent=section.hidden?"👨‍👩‍👧‍👧 Show family picks":"👨‍👩‍👧‍👧 Hide family picks";
+ $("family-lineup").setAttribute("aria-expanded",String(!section.hidden));
+ renderLineup();
+});
 $("online-open").addEventListener("click",openOnline);
 $("online-close").addEventListener("click",()=>{$("online-panel").hidden=true;});
 $("online-form").addEventListener("submit",event=>{event.preventDefault();void searchOnline($("online-search").value,false);});
