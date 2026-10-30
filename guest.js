@@ -389,12 +389,31 @@ function renderLineup(){
  }
  void images();
 }
-async function refreshFamily(){
+function familyFingerprint(data){
+ return JSON.stringify([data.familyChoices||data.choices||[],data.imports||[],data.ideas||[],data.people||[]]);
+}
+function loadFamilySnapshot(data){
+ lastFamilyFingerprint=familyFingerprint(data);
+ setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);
+ updateDiscoveryFilters();filter();renderLineup();
+}
+async function refreshFamily(manual=false){
+ if(familyRefreshing||choiceWrites||!me||(!manual&&document.hidden))return;
+ familyRefreshing=true;
+ if(manual)$("sync-status").textContent="Checking for updates…";
  try{
    const updated=await api({action:"guest"});
-   setFamilyData(updated);prepareImports(updated.imports);prepareIdeas(updated.ideas);
-   filter();renderLineup();notice("");
- }catch(error){notice("Could not refresh family selections: "+error.message);}
+   if(choiceWrites)return;
+   const stamp=familyFingerprint(updated);
+   if(stamp!==lastFamilyFingerprint){
+     loadFamilySnapshot(updated);
+     $("sync-status").textContent="Family updates loaded ✓";
+   }else if(manual)$("sync-status").textContent="Up to date ✓";
+   else $("sync-status").textContent="Synced · checks every 20s";
+ }catch(error){
+   $("sync-status").textContent="Sync paused · tap to retry";
+   if(manual)notice("Could not refresh family selections: "+error.message);
+ }finally{familyRefreshing=false;}
 }
 async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  const sourceUrl=safeUrl(row.sourceUrl);
@@ -529,6 +548,11 @@ $("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-per
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
 window.addEventListener("focus",()=>{if(me)void refreshFamily();});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me)void refreshFamily();});
+$("sync-status").addEventListener("click",()=>void refreshFamily(true));
+// Token-scoped reads, not unauthenticated Realtime subscriptions that bypass RLS.
+// Poll only while visible; foreground resumes immediately, keeping private links current.
+setInterval(()=>{if(me&&!document.hidden)void refreshFamily();},20000);
 async function start(){
  if(!token){notice("No invitation found. Ask the organizer to share your private link again.");return;}
  if(!config?.url||!config?.publishableKey){notice("Private gallery configuration is unavailable.");return;}
@@ -538,7 +562,7 @@ async function start(){
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
-   catalog=items;setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);notice("");filter();renderLineup();
+   catalog=items;loadFamilySnapshot(data);notice("");
  }catch(error){notice(error.message+". Ask the organizer for a new link if yours expired or was revoked.");sessionStorage.removeItem("pumpkin-person-invite");}
 }
 void start();
