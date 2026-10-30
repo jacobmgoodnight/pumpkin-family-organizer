@@ -1,15 +1,18 @@
 import {mountSmartSuggestions} from "./search-suggestions.js?v=20261030b";
+import {createInviteAccess} from "./guest-access.js?v=20261030g";
 // Invite-only family gallery. The token is a single-person bearer capability,
 // not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
 const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
 const $=id=>document.getElementById(id);
-const hashToken=new URLSearchParams(location.hash.slice(1)).get("invite");
-if(hashToken&&/^[A-Za-z0-9_-]{43}$/.test(hashToken)){
- sessionStorage.setItem("pumpkin-person-invite",hashToken);
- history.replaceState(null,"",location.pathname+location.search);
-}
-const token=sessionStorage.getItem("pumpkin-person-invite");
+const access=createInviteAccess({
+ hash:location.hash,
+ baseUrl:location.origin+location.pathname+location.search,
+ clearFragment:()=>history.replaceState(null,"",location.pathname+location.search),
+ getSession:()=>window.sessionStorage,
+ getPersistent:()=>window.localStorage
+});
+const token=access.token;
 let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
@@ -26,10 +29,26 @@ const api=async body=>{
  const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","apikey":config?.publishableKey||""},
    body:JSON.stringify({...body,token}),referrerPolicy:"no-referrer",cache:"no-store"});
  const data=await response.json().catch(()=>({error:"Connection unavailable"}));
- if(!response.ok||data.error)throw Error(data.error||"Connection unavailable");
+ if(!response.ok||data.error){
+   const error=new Error(data.error||"Connection unavailable");
+   error.status=response.status;
+   throw error;
+ }
  return data;
 };
 function normalize(v){return String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");}
+function updateRememberStatus(){
+ const saved=access.isRemembered();
+ $("remember-device").hidden=saved;
+ $("remember-status").textContent=saved?"✓ Saved on this device until the invitation expires":"";
+}
+function showAccessHelp(message,retry=false){
+ $("guest-app").hidden=true;
+ $("access-required").hidden=false;
+ $("access-required-message").textContent=message;
+ $("retry-access").hidden=!retry;
+ notice("");
+}
 function stateFor(id,person=viewPerson){return familyChoices.get(person)?.get(id)||{favorite:false,finalPick:false};}
 function selectedIsMe(){return viewPerson===me?.personId;}
 function selectionCount(person=viewPerson){
@@ -52,12 +71,14 @@ function setFamilyData(data){
  const choices=$("person-view");choices.replaceChildren();
  for(const person of people){
    const option=document.createElement("option");option.value=person.id;
-   option.textContent=person.name+(person.id===data.personId?" (mine)":" · view only");
+   option.textContent=person.name+(person.id===data.personId?" · me":" · view only");
    choices.append(option);
  }
  choices.value=viewPerson;
- $("greeting").textContent="Hi, "+data.name+"! 🎃";
- $("subtitle").textContent="Your family pumpkin gallery · link expires "+new Date(data.expiresAt).toLocaleDateString();
+ $("greeting").textContent="Pick your pumpkin 🎃";
+ $("subtitle").textContent="Private link expires "+new Date(data.expiresAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+ updateRememberStatus();
+ $("access-required").hidden=true;
  $("guest-app").hidden=false;
 }
 function prepareImports(rows){
@@ -163,6 +184,8 @@ function updateQuickViews(){
    $(id).setAttribute("aria-pressed",String(pressed));
  }
  const who=people.find(x=>x.id===viewPerson)?.name||"Family";
+ $("identity-heading").textContent=own?"Choosing as "+(me?.name||"you"):"Viewing "+who+"'s picks";
+ $("totals").hidden=own;
  $("view-heading").textContent=!own?who+"'s saved pumpkins"
    :selected==="favorite"?"My favorites"
    :selected==="picked"?"My final picks":"Find your pumpkin";
@@ -650,7 +673,35 @@ $("online-form").addEventListener("submit",event=>{
 });
 $("online-more").addEventListener("click",renderOnlineBatch);
 updateGoogleLink();updateOnlineResultSummary();
-$("forget").addEventListener("click",()=>{sessionStorage.removeItem("pumpkin-person-invite");location.href="./";});
+$("remember-device").addEventListener("click",()=>{
+ if(!me)return;
+ const result=access.remember(me.expiresAt);
+ $("remember-status").textContent=result.ok?"✓ Access saved on this device until the invitation expires":result.message;
+ if(result.ok)updateRememberStatus();
+});
+$("copy-link").addEventListener("click",async()=>{
+ const url=access.link();
+ if(!url)return;
+ try{
+   if(!navigator.clipboard?.writeText)throw Error("Clipboard not available");
+   await navigator.clipboard.writeText(url);
+   $("access-help-status").textContent="Private invitation copied. Keep it somewhere only you can access.";
+ }catch{
+   $("access-help-status").textContent="Copy unavailable. Ask the organizer to resend the link via Messages.";
+ }
+});
+$("share-link").hidden=!navigator.share;
+$("share-link").addEventListener("click",async()=>{
+ const url=access.link();
+ if(!url||!navigator.share)return;
+ try{await navigator.share({title:"My private pumpkin gallery",text:"My private family pumpkin gallery",url});}
+ catch(error){if(error.name!=="AbortError")$("access-help-status").textContent="Sharing unavailable; try Copy link.";}
+});
+$("forget").addEventListener("click",()=>{
+ access.forget();
+ location.replace(location.pathname+location.search);
+});
+$("retry-access").addEventListener("click",()=>void start());
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
 window.addEventListener("focus",()=>{if(me)void refreshFamily();});
@@ -660,8 +711,8 @@ $("sync-status").addEventListener("click",()=>void refreshFamily(true));
 // Poll only while visible; foreground resumes immediately, keeping private links current.
 setInterval(()=>{if(me&&!document.hidden)void refreshFamily();},20000);
 async function start(){
- if(!token){notice("No invitation found. Ask the organizer to share your private link again.");return;}
- if(!config?.url||!config?.publishableKey){notice("Private gallery configuration is unavailable.");return;}
+ if(!token){showAccessHelp("Open your personal link from Messages. If it expired or you're using a new phone, ask the organizer to resend or regenerate your invitation.");return;}
+ if(!config?.url||!config?.publishableKey){showAccessHelp("The family gallery is temporarily unavailable. Your private invitation is still saved.",true);return;}
  try{
    notice("Opening your private family gallery…");
    const [items,data]=await Promise.all([
@@ -669,6 +720,13 @@ async function start(){
      api({action:"guest"})
    ]);
    catalog=items;loadFamilySnapshot(data);notice("");
- }catch(error){notice(error.message+". Ask the organizer for a new link if yours expired or was revoked.");sessionStorage.removeItem("pumpkin-person-invite");}
+ }catch(error){
+   if(error.status===401){
+     access.invalidate();
+     showAccessHelp("This link has expired or was revoked. Ask the organizer to create and send a new private invitation.");
+   }else{
+     showAccessHelp("The family gallery could not connect. Your private link has not been cleared. Try again.",true);
+   }
+ }
 }
 void start();

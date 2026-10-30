@@ -4,9 +4,9 @@ export function init({getClient,getOwner,bridge,settings}){
  const section=document.createElement("details");
  section.id="family-profile-invites";
  section.style.cssText="margin-top:14px;border-top:1px solid #526659;padding:12px 0";
- const summary=document.createElement("summary");summary.textContent="🔗 Share private family links";
+ const summary=document.createElement("summary");summary.textContent="🔗 Share or resend private family links";
  summary.style.cssText="cursor:pointer;color:#efbf85;font-size:14px;font-weight:750";
- const intro=document.createElement("p");intro.textContent="Create a secure, expiring link for each person. They can browse designs and change only their own favorites and final picks, without email or the parent password. Share using Messages or Copy link. Anyone who has the link can use it until it expires or you revoke it.";
+ const intro=document.createElement("p");intro.textContent="Create an expiring personal link for each family member. If someone loses theirs, choose Resend / replace link to make a fresh one. The old link will stop working immediately. Share with Messages or Copy; anyone holding a link can use it until it expires or is revoked.";
  intro.style.cssText="font-size:12px;line-height:1.6;color:#c6d3c6";
  const daysBox=document.createElement("label");daysBox.textContent="Link expires after ";daysBox.style.cssText="font-size:13px;display:block;margin:9px 0";
  const days=document.createElement("select");
@@ -59,9 +59,9 @@ export function init({getClient,getOwner,bridge,settings}){
          message.style.color="#c4d3c6";line.append(message);
        }
        const buttons=document.createElement("div");buttons.style.cssText="display:flex;flex-wrap:wrap;gap:7px";
-       const create=actionButton(existing?"Replace link":"Create private link",async()=>{
+       const create=actionButton(existing?"Resend / replace link":"Create private link",async()=>{
          if(busy||!getOwner())return;
-         if(existing&&!confirm("Replace this link for "+person.name+"? The old link will stop working immediately."))return;
+         if(existing&&!confirm("Create a fresh link for "+person.name+"? Their old link will stop working immediately, including any remembered devices. Share the new link with them."))return;
          busy=true;create.disabled=true;notify("Creating "+person.name+"'s private link…");
          try{
            const created=await api({action:"create",personId:person.id,days:Number(days.value)});
