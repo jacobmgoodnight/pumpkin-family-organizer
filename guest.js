@@ -145,7 +145,7 @@ function viewPersonSelection(personId){
  viewPerson=personId;
  $("person-view").value=personId;
  $("filter").value=mine?"all":"favorite";
- $("search").value="";
+ $("search").value="";$("theme").value="all";$("difficulty").value="all";
  filter();
 }
 function chooseOtherList(kind){
@@ -390,7 +390,10 @@ function renderLineup(){
  void images();
 }
 function familyFingerprint(data){
- return JSON.stringify([data.familyChoices||data.choices||[],data.imports||[],data.ideas||[],data.people||[]]);
+ const choices=[...(data.familyChoices||data.choices||[])].sort((a,b)=>String(a.personId||a.person_id).localeCompare(String(b.personId||b.person_id))||String(a.templateId||a.template_id).localeCompare(String(b.templateId||b.template_id)));
+ const imports=[...(data.imports||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ const ideas=[...(data.ideas||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ return JSON.stringify([choices,imports,ideas,data.people||[]]);
 }
 function loadFamilySnapshot(data){
  lastFamilyFingerprint=familyFingerprint(data);
@@ -459,7 +462,10 @@ function makeImportButton(row){
    action.disabled=true;action.textContent="Importing…";
    try{
      const item=await importOnlineImage(row);
-     if(item)action.textContent="✓ In family library";
+     if(item){
+       action.textContent="✓ In family library";
+       if($("preview-dialog").open)openPreview(item);
+     }
      else {action.disabled=false;action.textContent="⬇ Import to family";}
    }catch(error){
      action.disabled=false;action.textContent="⬇ Try import again";
