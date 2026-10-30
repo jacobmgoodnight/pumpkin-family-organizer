@@ -256,7 +256,12 @@ function render(){
    if(stateFor(item.id).finalPick){
      const tag=document.createElement("span");tag.className="picked-label";tag.textContent="🎃 Final pick";area.append(tag);
    }
-   area.append(title,category,itemActions(item));
+   area.append(title,category);
+   if(item.source==="web"){
+     const marker=document.createElement("small");marker.className="idea-only-marker";
+     marker.textContent="💡 Inspiration link · no printable file yet";area.append(marker);
+   }
+   area.append(itemActions(item));
    const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
    area.append(compare);
@@ -294,7 +299,11 @@ function refreshModal(){
  image.referrerPolicy="no-referrer";
  image.src=item.source==="web"?(safeUrl(item.thumbnail)||"app-icon.svg"):(cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg");
  if(item.thumbnail&&item.source!=="web"&&(!cached||cached.expires<=Date.now()))void images();
- $("preview-description").textContent=[item.category,item.difficulty,item.source==="family"?"Family import":"Built-in design"].filter(Boolean).join(" · ");
+ $("preview-description").textContent=item.source==="web"
+   ?"Saved online idea · Source link only. No printable file has been imported. Ask the organizer to import a permitted image."
+   :item.source==="family"
+     ?"Family import · Private image/PDF is available to open for printing. Check the original's quality."
+     :[item.category,item.difficulty,"Built-in design · Licensed original remains on organizer's computer"].filter(Boolean).join(" · ");
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
