@@ -3,20 +3,40 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030f">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261030g">
 </head><body>
 <header><div class="container head">
- <div><small>🎃 Goodnight Family</small><h1 id="greeting">Your pumpkin designs</h1><p id="subtitle">Opening your private invitation…</p></div>
- <a href="./" class="quiet">Organizer sign-in</a>
+ <div><small>🎃 Goodnight Family</small><h1 id="greeting">Pick your pumpkin</h1></div>
 </div></header>
 <main class="container">
  <p id="alert" role="status" aria-live="polite"></p>
+ <section id="access-required" class="access-required" hidden aria-labelledby="access-required-heading">
+  <h2 id="access-required-heading">Your family link is needed</h2>
+  <p id="access-required-message">Open your personal pumpkin link from Messages or ask the organizer to send it again.</p>
+  <button id="retry-access" type="button" hidden>Try again</button>
+  <a href="./">Organizer sign-in</a>
+ </section>
  <section id="guest-app" hidden>
-  <div class="guest-person">
-   <label for="person-view">Who’s picking a pumpkin?</label>
-   <select id="person-view" aria-label="Choose a family member to view"></select>
-   <span id="read-only" class="read-only" hidden>Viewing only · changes are disabled for other people</span>
+  <div class="guest-home">
+   <div class="guest-home-heading">
+    <strong id="identity-heading">Your pumpkin gallery</strong>
+    <p id="subtitle">Opening your private invitation…</p>
+   </div>
+   <label class="guest-view-picker" for="person-view">
+    <span>View family picks</span>
+    <select id="person-view" aria-label="View your pumpkins or another person's saved choices"></select>
+   </label>
+   <div class="guest-remember">
+    <button id="remember-device" type="button">Remember this device</button>
+    <span id="remember-status" role="status" aria-live="polite"></span>
+   </div>
+   <span id="read-only" class="read-only" hidden>Other people's choices are view-only</span>
   </div>
+  <nav id="guest-views" class="guest-views" aria-label="Your pumpkin views">
+   <button id="quick-all" type="button" aria-pressed="true">All designs</button>
+   <button id="quick-favorites" type="button" aria-pressed="false">♥ My favorites <span id="quick-favorites-count">0</span></button>
+   <button id="quick-picks" type="button" aria-pressed="false">✓ My picks <span id="quick-picks-count">0</span></button>
+  </nav>
   <nav class="guest-nav" aria-label="Family library actions">
    <button id="family-lineup" type="button" aria-expanded="false">👨‍👩‍👧‍👧 Show family picks</button>
    <button id="compare-open" type="button" disabled>Compare <span id="compare-count">0</span>/3</button>
@@ -32,11 +52,7 @@
     <button id="other-saved" type="button" aria-pressed="false">All saved</button>
    </nav>
   </section>
-  <nav id="guest-views" class="guest-views" aria-label="Your pumpkin views">
-   <button id="quick-all" type="button" aria-pressed="true">All designs</button>
-   <button id="quick-favorites" type="button" aria-pressed="false">♥ My favorites <span id="quick-favorites-count">0</span></button>
-   <button id="quick-picks" type="button" aria-pressed="false">✓ My picks <span id="quick-picks-count">0</span></button>
-  </nav>
+
   <div id="browse-toolbar" class="toolbar">
    <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off" enterkeyhint="search" inputmode="search"></label>
    <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option><option value="web">Saved online ideas</option></select></label>
@@ -79,8 +95,17 @@
     <button id="online-more" class="more" type="button" hidden>Show more images</button>
    </details>
   </section>
-  <p class="note">Your link saves your own favorites and picks. Saved web ideas are shared as source links, not printable files; the organizer can import authorized originals. Built-in originals remain on the organizer’s computer.</p>
-  <button id="forget" class="quiet danger">Forget private link on this device</button>
+  <details id="access-help" class="access-help">
+   <summary>Private link &amp; access help</summary>
+   <p>Use your invitation only on a trusted device. You can remember access here or copy your link to keep in Messages. Links still expire and can be revoked by the organizer.</p>
+   <div class="access-actions">
+    <button id="copy-link" type="button">Copy my private link</button>
+    <button id="share-link" type="button" hidden>Share link…</button>
+    <button id="forget" type="button" class="danger">Forget this device</button>
+   </div>
+   <p id="access-help-status" role="status" aria-live="polite"></p>
+   <a href="./" class="quiet">Organizer sign-in</a>
+  </details>
  </section>
 </main>
 <dialog id="preview-dialog" class="guest-dialog" aria-labelledby="preview-title">
@@ -99,5 +124,5 @@
  <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
  <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030f"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261030g"></script>
 </body></html>
