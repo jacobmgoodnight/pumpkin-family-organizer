@@ -351,7 +351,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    try{
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-     import('./family-invites.js').then(module=>module.init({
+     import('./family-invites.js?v=20261029c').then(module=>module.init({
        getClient:()=>client,getOwner:()=>owner,bridge,settings:accountSettings
      })).catch(error=>console.warn("Family invitation manager unavailable",error));
      async function onSession(session){
@@ -588,6 +588,6 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(!failed)uploadDetails.open=false;
  });
  start();
- import('./family-features.js').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
- import('./search-suggestions.js').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
+ import('./family-features.js?v=20261029c').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
+ import('./search-suggestions.js?v=20261029c').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
 }
