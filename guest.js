@@ -166,7 +166,9 @@ function refreshModal(){
  const item=openedItem;$("preview-title").textContent=item.name;
  const image=$("preview-image"),cached=previewCache.get(item.thumbnail);
  image.alt="Enlarged "+item.name;
- image.src=cached?.expires>Date.now()?cached.url:"app-icon.svg";
+ if(item.thumbnail)image.dataset.preview=item.thumbnail;
+ else delete image.dataset.preview;
+ image.src=cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg";
  if(item.thumbnail&&(!cached||cached.expires<=Date.now()))void images();
  $("preview-description").textContent=[item.category,item.difficulty,item.source==="family"?"Family import":"Built-in design"].filter(Boolean).join(" · ");
  const actions=$("preview-actions");actions.replaceChildren();
