@@ -1,3 +1,4 @@
+import {mountSmartSuggestions} from "./search-suggestions.js?v=20261030b";
 // Invite-only family gallery. The token is a single-person bearer capability,
 // not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
@@ -102,6 +103,29 @@ function filter(){
  matches.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
  visible=24;render();
 }
+function selectQuickView(kind){
+ // Quick shortcuts always return to your personal list, without retaining a
+ // previous search term that could make your favorites seem to disappear.
+ if(!me)return;
+ viewPerson=me.personId;
+ $("person-view").value=viewPerson;
+ $("filter").value=kind;
+ $("search").value="";
+ filter();
+}
+function updateQuickViews(){
+ const selected=$("filter").value,own=selectedIsMe(),counts=selectionCount(me?.personId);
+ $("quick-favorites-count").textContent=String(counts.favorites);
+ $("quick-picks-count").textContent=String(counts.picks);
+ for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
+   const pressed=selected===kind&&(kind==="all"||own);
+   $(id).setAttribute("aria-pressed",String(pressed));
+ }
+ const who=people.find(x=>x.id===viewPerson)?.name||"Family";
+ $("view-heading").textContent=selected==="favorite"?(own?"My favorites":who+"'s favorites")
+   :selected==="picked"?(own?"My final picks":who+"'s final picks")
+   :selected==="all"?"Find your pumpkin":"Find your pumpkin";
+}
 function createImage(item,click){
  const control=button("",click,"image-open");control.setAttribute("aria-label","Enlarge "+item.name);
  const img=document.createElement("img");img.loading="lazy";img.alt=item.name+" carving preview";
@@ -177,6 +201,8 @@ function render(){
  const counts=selectionCount(),person=people.find(x=>x.id===viewPerson);
  $("totals").textContent=(person?.name||"Family")+": "+counts.favorites+" favorites · "+counts.picks+" final picks";
  $("read-only").hidden=selectedIsMe();
+ updateQuickViews();
+ const empty=$("empty-results");empty.hidden=matches.length!==0;
  void images();
 }
 function attachDialogClose(dialog,buttonId){
@@ -406,6 +432,11 @@ function openOnline(){
  else $("online-status").textContent="Enter a design or character to find Google Images suggestions.";
 }
 $("search").addEventListener("input",filter);
+for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
+ $(id).addEventListener("click",()=>selectQuickView(kind));
+}
+$("empty-reset").addEventListener("click",()=>selectQuickView("all"));
+mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
 $("filter").addEventListener("change",filter);
 $("person-view").addEventListener("change",()=>{viewPerson=$("person-view").value;compareIds.clear();updateCompare();filter();refreshModal();});
 $("more").addEventListener("click",()=>{visible+=24;render();});
