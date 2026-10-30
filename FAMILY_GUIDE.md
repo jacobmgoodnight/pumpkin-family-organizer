@@ -95,3 +95,11 @@ The family lineup now shows image thumbnails; search has more filters plus Surpr
 
 ### iPhone Search keyboard and Google Images
 In your private link, press **Search/Return** after typing a pumpkin name to dismiss the keyboard and see the gallery. Tapping a Smart Search suggestion also closes the keyboard. If you still want more options, tap **Find more online for “your search”** above the gallery: it starts that Google Images search in one tap. You can also use the always-visible **Find more online** search field below the catalog; type a design and tap Search. The images/results can be collapsed without losing the query. Online searches have shared family limits, so repeated recent queries are reused when possible.
+
+
+### Returning to your private gallery without finding the invitation again
+On your own trusted phone or tablet, open the personal invitation once, then tap **Remember this device** at the top. The same device can reopen the regular pumpkin guest page and recover your access until your invitation expires. If you prefer not to save access on that device, open **Private link & access help** at the bottom and choose **Copy my private link** (or Share) to keep it in Messages or another private location. **Forget this device** clears saved and session access on that browser.
+
+The organizer can always replace an expired or revoked personal link. A copied or remembered link **does not bypass** expiration or revocation and **does not** give organizer access. Anyone who uses the same browser while access is remembered can act as that participant, so do not choose Remember on public or shared family devices. A different phone/browser still needs the invitation link; this feature is not an email/password recovery account.
+
+The top of the private page shows the person's name and link expiration, a compact family-view selector, then All Designs, My Favorites, and My Picks. Pick someone else to see their saved selections read-only, or choose yourself to return to full browsing.
