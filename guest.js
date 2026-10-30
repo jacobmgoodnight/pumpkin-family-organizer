@@ -308,8 +308,11 @@ async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  prepareIdeas(savedIdeas);
  const item=library.get("web:"+idea.id);
  if(favorite){
-   const response=await api({action:"choice",templateId:item.id,favorite:true,finalPick:false});
+   const prior=stateFor(item.id,me.personId);
+   const response=await api({action:"choice",templateId:item.id,favorite:true,finalPick:!!prior.finalPick});
    familyChoices.get(me.personId).set(item.id,{favorite:!!response.favorite,finalPick:!!response.finalPick});
+   // Saving your own favorite while viewing a sibling must never edit their selection.
+   if(!selectedIsMe()){viewPerson=me.personId;$("person-view").value=me.personId;}
  }
  if(compare)addCompare(item);
  filter();renderLineup();
