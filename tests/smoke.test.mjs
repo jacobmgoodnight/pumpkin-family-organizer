@@ -243,7 +243,7 @@ test("Private family gallery starts with collapsed lineup and first-class person
  assert.match(guest,/getItems:\(\)=>catalog/);
  assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
- assert.match(page,/guest\.js\?v=20261030e/);
+ assert.match(page,/guest\.js\?v=20261030f/);
 });
 
 test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
@@ -296,18 +296,26 @@ test("Private Final Pick celebration occurs only following an acknowledged newly
  assert.match(css,/\.card\.selected-pick/);
 });
 
-test("Find more online is a collapsed native disclosure underneath browsing",()=>{
+test("Google discovery is a one-step inline search with collapsible results",()=>{
  const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
- assert.match(page,/<details id="online-panel"/);
- assert.match(page,/class="online-discovery-summary"/);
+ assert.match(page,/<section id="online-panel"/);
+ assert.match(page,/<form id="online-form"[^>]*role="search"/);
+ assert.match(page,/<details id="online-results-panel"/);
+ assert.match(page,/id="browse-online"/);
+ assert.match(page,/id="online-search"[^>]+enterkeyhint="search"/);
+ assert.match(page,/id="search"[^>]+enterkeyhint="search"/);
  assert.ok(page.indexOf('id="online-panel"')>page.indexOf('id="more"'));
  assert.ok(!page.includes('id="online-open"'));
  assert.ok(!page.includes('id="online-close"'));
- assert.match(guest,/\$\("online-panel"\)\.addEventListener\("toggle"/);
+ assert.match(guest,/async function requestOnlineSearch\(term\)/);
+ assert.match(guest,/\$\("browse-online"\)\.addEventListener\("click"/);
+ assert.match(guest,/\$\("online-form"\)\.addEventListener\("submit"/);
+ assert.match(guest,/\$\("online-results-panel"\)\.open=true/);
  assert.match(guest,/\$\("online-panel"\)\.hidden=!own/);
- assert.match(css,/\.online-discovery-summary/);
+ assert.match(css,/\.online-results-panel/);
  assert.match(css,/\.online-discovery a:visited/);
- assert.match(page,/guest\.css\?v=20261030e/);
+ assert.match(page,/guest\.css\?v=20261030f/);
+ assert.match(page,/guest\.js\?v=20261030f/);
 });
 
 test("Web ideas are explicitly preview-only, family imports are printable",()=>{
