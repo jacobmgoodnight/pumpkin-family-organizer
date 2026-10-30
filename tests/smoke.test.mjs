@@ -205,7 +205,7 @@ test("Participant web ideas are saved through the scoped invitation API",()=>{
  assert.match(page,/<option value="web">Saved online ideas<\/option>/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('class="catalog-heading"'));
  assert.ok(page.indexOf('id="online-panel"')>page.indexOf('id="grid"'));
- assert.match(page,/id="family-lineup"[^>]+aria-expanded="true"/);
+ assert.match(page,/id="family-lineup"[^>]+aria-expanded="false"/);
 });
 test("Participant search preserves exact match priority over curated tie preference",()=>{
  const guest=file("guest.js");
