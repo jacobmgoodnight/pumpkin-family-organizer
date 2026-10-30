@@ -71,7 +71,7 @@ test("No plain browser links to protected original catalog",()=>{
 
 test("Mobile layout assigns sort and action buttons separate grid cells",()=>{
  const css=readFileSync(new URL("../mobile-polish.css",import.meta.url),"utf8");
- assert.match(html,/href="mobile-polish\.css"/);
+ assert.match(html,/href="mobile-polish\.css(?:\?[^"]*)?"/);
  assert.match(css,/\.sort-inline\{grid-column:1\/-1/);
  assert.match(css,/\.toolbar-tail #surprise\{grid-column:1\}/);
  assert.match(css,/\.toolbar-tail #clear-filters\{grid-column:2\}/);
@@ -125,7 +125,7 @@ test("Family-first layout keeps one real search input and original handlers",()=
  assert.ok(html.indexOf('class="profile-panel"')<html.indexOf('id="search-first"'));
  assert.ok(html.indexOf('id="search-first"')<html.indexOf('id="tabs"'));
  assert.ok(html.includes('id="advanced-filters"'));
- assert.match(html,/src="search-first\.js"/);
+ assert.match(html,/src="search-first\.js(?:\?[^"]*)?"/);
  assert.match(html,/getElementById\('search-first'\)/);
  assert.match(searchFirst,/details\.open=!details\.open/);
  assert.match(searchFirst,/aria-expanded/);
