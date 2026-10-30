@@ -605,7 +605,7 @@ $("empty-reset").addEventListener("click",()=>{
  if(selectedIsMe())selectQuickView("all");
  else viewPersonSelection(me.personId);
 });
-const guestSuggestions=mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions"});
+const guestSuggestions=mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions",dismissOnChoose:true});
 $("search").addEventListener("keydown",event=>{
  if(event.key==="Enter"){
    event.preventDefault();
