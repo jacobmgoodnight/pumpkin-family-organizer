@@ -89,11 +89,12 @@ export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-sugges
    if(getComputedStyle(host).position==="static")host.style.position="relative";
    const r=el.getBoundingClientRect(),p=host.getBoundingClientRect();
    const vv=window.visualViewport;
+   const visibleTop=vv?vv.offsetTop:0;
    const visibleBottom=vv?vv.offsetTop+vv.height:window.innerHeight;
    const room=visibleBottom-r.bottom-12;
    // If the keyboard leaves too little space below the field, suppress rather
    // than drawing a panel on top of the field or other content.
-   if(room<92||r.bottom<0||r.top>=visibleBottom)return false;
+   if(room<92||r.top<visibleTop||r.top>=visibleBottom)return false;
    panel.style.left=Math.max(0,r.left-p.left)+"px";
    panel.style.top=Math.max(0,r.bottom-p.top+5)+"px";
    panel.style.width=Math.max(140,r.width)+"px";
