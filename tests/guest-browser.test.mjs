@@ -24,27 +24,69 @@ const catalog=[
  {id:'cat',name:'Cat Face',category:'Animals',difficulty:'Easy',source:'zombie',tags:[]},
  {id:'ghost',name:'Ghost Face',category:'Spooky',difficulty:'Hard',source:'additional',tags:[]}
 ];
-const household={personId:'me',name:'Charlotte',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Charlotte'}],familyChoices:[{personId:'me',templateId:'cat',favorite:true,finalPick:true}],imports:[],ideas:[]};
+const household=JSON.parse(sessionStorage.getItem('__mockHousehold')||'null')||{personId:'me',name:'Charlotte',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Charlotte'}],familyChoices:[{personId:'me',templateId:'cat',favorite:true,finalPick:true}],imports:[],ideas:[]};
 window.__searchQueries=[];
 window.__choiceRequests=[];
+window.confirm=()=>true;
+window.open=()=>{const popup={location:{href:''},close(){}};window.__popup=popup;return popup;};
 window.fetch=async (url,opts={})=>{
  if(String(url).includes('guest-catalog.json'))return new Response(JSON.stringify(catalog),{status:200});
  if(String(url).includes('/functions/v1/pumpkin-profile-invites')){
   const body=JSON.parse(opts.body);let data;
   if(body.action==='guest'){
    data=structuredClone(household);
-   if(window.__deferRefresh){window.__deferRefresh=false;await new Promise(resolve=>window.__resolveRefresh=resolve);}
+   if(window.__deferRefresh){window.__deferRefresh=false;if(window.__staleChange)data.people.push({id:'other',name:'Other'});await new Promise(resolve=>window.__resolveRefresh=resolve);}
   }else if(body.action==='choice'){
    window.__choiceRequests.push(body);
    if(window.__deferChoice){window.__deferChoice=false;await new Promise(resolve=>window.__resolveChoice=resolve);}
    household.familyChoices=household.familyChoices.filter(x=>x.templateId!==body.templateId);
    household.familyChoices.push({personId:'me',templateId:body.templateId,favorite:body.favorite,finalPick:body.finalPick});
+   sessionStorage.setItem('__mockHousehold',JSON.stringify(household));
    data={favorite:body.favorite,finalPick:body.finalPick};
-  }else data=body.action==='search'?(window.__searchQueries.push(body.query),{results:[]}):{links:{}};
+  }else if(body.action==='import'){
+   const imported={id:'import-1',name:'Owl Lantern',category:'Family imports',tags:[],thumbnail_path:'private/owl.png',original_path:'private/owl.png'};
+   household.imports.push(imported);sessionStorage.setItem('__mockHousehold',JSON.stringify(household));data={imported};
+  }else if(body.action==='print'){window.__printed=body.importId;data={url:'https://example.com/signed-print'};}
+  else data=body.action==='search'?(window.__searchQueries.push(body.query),{results:[{title:'Owl Lantern',source:'Example',sourceUrl:'https://example.com/owl',thumbnail:'https://example.com/owl.png',importTicket:'ticket'}]}):{links:{}};
   return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
  }
  return originalFetch(url,opts);
 };
+</script>`;
+
+const importDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out waiting for page');};
+ const $=id=>document.getElementById(id);
+ const card=()=>[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Owl Lantern'));
+ const action=(name)=>[...card().querySelectorAll('button')].find(b=>b.textContent.includes(name));
+ try{
+  await wait(()=>!$('guest-app').hidden && $('grid').children.length);
+  if(!sessionStorage.getItem('__importStage')){
+   $('online-search').value='owl';$('online-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+   await wait(()=>$('online-results').querySelector('.web-import'));
+   window.__deferRefresh=true;window.__staleChange=true;$('sync-status').click();await wait(()=>window.__resolveRefresh);
+   $('online-results').querySelector('.web-import').click();
+   await wait(()=>card() && $('online-results').textContent.includes('In family library'));
+   check('confirmed import appears while a refresh is in flight',!!card());
+   window.__resolveRefresh();await new Promise(r=>setTimeout(r,30));
+   check('stale refresh keeps the imported design visible',!!card());
+   action('Save').click();await wait(()=>action('Saved')&&!action('Saved').disabled);
+   action('Pick').click();await wait(()=>action('Picked')&&!action('Picked').disabled);
+   check('import can be saved and picked',!!action('Saved')&&!!action('Picked'));
+   action('Open / print').click();await wait(()=>window.__popup?.location.href);
+   check('print opens the imported original',window.__printed==='import-1'&&window.__popup.location.href==='https://example.com/signed-print');
+   sessionStorage.setItem('__importChecks',JSON.stringify(checks));sessionStorage.setItem('__importStage','reloaded');location.reload();return;
+  }
+  checks.push(...JSON.parse(sessionStorage.getItem('__importChecks')));
+  $('quick-picks').click();
+  check('import and final pick survive a reload',!!card()&&!!action('Picked'));
+  action('Open / print').click();await wait(()=>window.__popup?.location.href);
+  check('print still works after reload',window.__printed==='import-1');
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
 </script>`;
 const driver = `<script>
 (async()=>{
@@ -97,8 +139,8 @@ function fixtureServer(driverScript='') {
  });
 }
 
-test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, async () => {
- const server = fixtureServer(driver);
+async function runJourney(script) {
+ const server = fixtureServer(script);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-browser-'));
  try {
@@ -116,7 +158,10 @@ test('participant shortcuts and search work in a browser', { skip: !browser && '
   const checks=JSON.parse(match[1].replaceAll('&quot;','"').replaceAll('&amp;','&').replaceAll('&lt;','<').replaceAll('&gt;','>'));
   assert.deepEqual(checks.filter(c=>!c.ok),[]);
  } finally {server.close();try{rmSync(profile,{recursive:true,force:true});}catch{}}
-});
+}
+
+test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, () => runJourney(driver));
+test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, () => runJourney(importDriver));
 
 test('participant controls fit emulated mobile and desktop viewports', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, async () => {
  const server=fixtureServer();

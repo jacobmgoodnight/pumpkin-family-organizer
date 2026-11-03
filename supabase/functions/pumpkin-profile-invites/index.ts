@@ -137,7 +137,10 @@ Deno.serve(async(request)=>{
    const now=new Date().toISOString();
    const {data:invite,error:inviteError}=await admin.from("pc_profile_invites")
       .select("owner_id,person_id,expires_at").eq("token_hash",tokenHash).is("revoked_at",null).gt("expires_at",now).maybeSingle();
-   if(inviteError||!invite)return fail("Invitation invalid or expired",401);
+   // A temporary database failure does not prove the bearer token is invalid.
+   // The client clears remembered credentials only for an actual rejection.
+   if(inviteError)throw Error("Invitation lookup unavailable");
+   if(!invite)return fail("Invitation invalid or expired",401);
    const uid=invite.owner_id,personId=invite.person_id;
    if(action==="guest"){
      const [member,people,rows,imported,ideas]=await Promise.all([

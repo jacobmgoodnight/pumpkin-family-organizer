@@ -42,6 +42,8 @@ test("Opening a different person's private link never silently restores a former
  assert.equal(next.access.token,B);
  assert.equal(next.access.isRemembered(),false);
  assert.equal(next.session.getItem(SESSION_KEY),B);
+ assert.equal(JSON.parse(next.local.getItem(REMEMBER_KEY)).token,A);
+ next.access.confirm();
  assert.equal(next.local.getItem(REMEMBER_KEY),null);
 });
 test("Revoked link cleanup and intentional device sign-out erase local credentials",()=>{

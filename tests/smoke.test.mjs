@@ -4,6 +4,7 @@ import {readFileSync,existsSync} from "node:fs";
 import {execFileSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import vm from "node:vm";
+import {guestSearchScore} from "../guest-search.js";
 
 const file=name=>readFileSync(new URL("../"+name,import.meta.url),"utf8");
 const html=file("index.html"),sync=file("family-sync.js"),features=file("family-features.js");
@@ -212,10 +213,7 @@ test("Participant web ideas are saved through the scoped invitation API",()=>{
 });
 test("Participant search preserves exact match priority over curated tie preference",()=>{
  const guest=file("guest.js");
- const first=guest.indexOf("function guestScore("),last=guest.indexOf("function filter()",first);
- assert.ok(first>0&&last>first);
- const normalize=v=>String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");
- const score=new Function("normalize",guest.slice(first,last)+"return guestScore;")(normalize);
+ const score=guestSearchScore;
  assert.ok(score({name:"Ghost",category:"Other",tags:[]},"ghost")>score({name:"Ghostly Cat",category:"Other",tags:[]},"ghost"));
  assert.ok(score({name:"Ghost",category:"Other",tags:[]},"ghost")>score({name:"Boo",category:"Ghosts",tags:[]},"ghost"));
  assert.match(guest,/a\.source==="zombie"\?0:1/);

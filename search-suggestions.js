@@ -29,7 +29,7 @@ export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-sugges
      if(normalized.length>=2&&!seen.has(normalized)){
        seen.add(normalized);titles.push({value:name,normalized,source:x.source});
      }
-     const data=[name,...(x.tags||[]),...(x.keywords||[]),x.theme||"",x.category||""];
+     const data=[name,...(x.tags||[]),...(x.keywords||[]),...(x.visual?.tags||[]),x.theme||"",x.category||""];
      for(const word of new Set(normal(data.join(" ")).split(" "))){
        if(word.length<3||word.length>28||omit.has(word)||/^\d+$/.test(word))continue;
        words.set(word,(words.get(word)||0)+1);
@@ -147,7 +147,7 @@ export function mountSmartSuggestions({inputs,getItems,id="pumpkin-search-sugges
  window.addEventListener("resize",()=>{if(active&&!panel.hidden&&!position(active))hide();},{passive:true});
  window.visualViewport?.addEventListener("resize",()=>{if(active&&!panel.hidden&&!position(active))hide();},{passive:true});
  window.visualViewport?.addEventListener("scroll",()=>{if(active&&!panel.hidden&&!position(active))hide();},{passive:true});
- return {hide};
+ return {hide,refresh(){stamp="";if(active)show(active);}};
 }
 export function init(){
  const main=document.getElementById("search"),sticky=document.getElementById("sticky-search");
