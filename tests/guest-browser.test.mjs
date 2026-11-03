@@ -1,3 +1,4 @@
+import {findBrowser} from "./browser-executable.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -10,11 +11,7 @@ import { fileURLToPath } from 'node:url';
 // This is deliberately optional: npm test also runs on machines without a
 // browser. Set PUMPKIN_TEST_BROWSER to a Chromium-compatible executable.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const browser = [process.env.PUMPKIN_TEST_BROWSER,
-  process.platform === 'win32' && 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-  process.platform === 'win32' && 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'
-].find(p => p && existsSync(p));
+const browser=findBrowser();
 
 // Exercise the shipped page and scripts with a fake API, never production data.
 const setup = `<script>

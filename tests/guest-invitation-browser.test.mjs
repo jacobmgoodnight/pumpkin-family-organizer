@@ -1,3 +1,4 @@
+import {findBrowser} from "./browser-executable.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
@@ -8,10 +9,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const browser=[process.env.PUMPKIN_TEST_BROWSER,
- process.platform==='win32'&&'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
- process.platform==='win32'&&'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
- '/usr/bin/chromium','/usr/bin/chromium-browser','/usr/bin/google-chrome'].find(p=>p&&existsSync(p));
+const browser=findBrowser();
 const A='a'.repeat(43),B='b'.repeat(43),C='c'.repeat(43);
 const SESSION='pumpkin-person-invite',REMEMBER='pumpkin-person-invite-remembered-v1';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
