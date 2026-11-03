@@ -445,7 +445,10 @@ async function refreshFamily(manual=false){
  if(manual)$("sync-status").textContent="Checking for updates…";
  try{
    const updated=await api({action:"guest"});
-   if(choiceWrites||generation!==choiceGeneration)return;
+   if(choiceWrites||generation!==choiceGeneration){
+     $("sync-status").textContent="Updates may be out of date · tap to refresh";
+     return;
+   }
    const stamp=familyFingerprint(updated);
    if(stamp!==lastFamilyFingerprint){
      loadFamilySnapshot(updated);
@@ -483,9 +486,7 @@ async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  return item;
 }
 async function importOnlineImage(row){
- if(!row.importTicket)throw Error(row.importUnavailableReason==="temporarily_disabled"
-   ?"Automatic import is temporarily unavailable. Save the idea to find it later."
-   :"This result has no downloadable original image. Save the idea or try another result.");
+ if(!row.importTicket)throw Error("This result has no downloadable original image. Save the idea or try another result.");
  if(!selectedIsMe())throw Error("Return to your own pumpkins to import a design.");
  if(!confirm("Import this original image into your private family library? Only continue if you have permission to save it for family use. The image may still need quality checks before printing."))return null;
  $("online-status").textContent="Downloading the original to private family storage…";
@@ -517,12 +518,7 @@ function makeImportButton(row){
      notice("Automatic import unavailable: "+error.message);
    }
  },"web-import");
- if(!row.importTicket){
-   action.disabled=true;
-   const paused=row.importUnavailableReason==="temporarily_disabled";
-   action.title=paused?"Automatic import is temporarily unavailable. Save the idea instead.":"Search result has no downloadable original image. Save the link instead.";
-   action.textContent=paused?"Import temporarily unavailable":"Original unavailable";
- }
+ if(!row.importTicket){action.disabled=true;action.title="Search result has no downloadable original image. Save the link instead.";action.textContent="Original unavailable";}
  return action;
 }
 function openOnlinePreview(row){
@@ -600,13 +596,6 @@ function updateOnlineResultSummary(){
    ?"Google Images results ("+count+") · Tap to show or hide"
    :"Online search results and help";
 }
-function onlineResultStatus(reused=false){
- const count=onlineResults.length;
- if(onlineResults.some(row=>row.importUnavailableReason==="temporarily_disabled"))
-   return count+" image ideas · Automatic import is temporarily unavailable. You can still save an idea and open its source.";
- return reused?count+" results · Recent search reused without spending credits"
-   :count+" image ideas · Original sources may have usage restrictions. Online searches share the family's 15/hour, 40/day limits.";
-}
 async function requestOnlineSearch(term){
  const query=term.trim();
  if(query.length<2){
@@ -627,7 +616,7 @@ async function searchOnline(term,reuse=true){
  const cache=onlineCache.get(key);
  if(reuse&&cache&&Date.now()-cache.time<15*60*1000){
    onlineResults=cache.results;onlineShown=0;$("online-results").replaceChildren();
-   $("online-status").textContent=onlineResultStatus(true);
+   $("online-status").textContent=onlineResults.length+" results · Recent search reused without spending credits";
    updateOnlineResultSummary();renderOnlineBatch();return;
  }
  onlinePending=true;$("online-search-button").disabled=true;$("online-search-button").textContent="Searching…";$("browse-online").disabled=true;
@@ -636,7 +625,7 @@ async function searchOnline(term,reuse=true){
    const data=await api({action:"search",query:q});
    onlineResults=data.results||[];onlineShown=0;onlineCache.set(key,{time:Date.now(),results:onlineResults});
    if(onlineCache.size>12)onlineCache.delete(onlineCache.keys().next().value);
-   $("online-status").textContent=onlineResultStatus();
+   $("online-status").textContent=onlineResults.length+" image ideas · Original sources may have usage restrictions. Online searches share the family's 15/hour, 40/day limits.";
    updateOnlineResultSummary();renderOnlineBatch();
  }catch(error){$("online-status").textContent="Unable to search: "+error.message+". You can still browse your existing catalog.";}
  

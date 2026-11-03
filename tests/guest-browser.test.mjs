@@ -69,6 +69,7 @@ const driver = `<script>
   action('Pick').click();await wait(()=>window.__choiceRequests.length===2 && action('Picked') && !action('Picked').disabled);
   window.__resolveRefresh();await new Promise(r=>setTimeout(r,20));
   check('stale refresh does not undo confirmed pick',!!action('Picked') && $('quick-picks-count').textContent==='2');
+  check('stale refresh offers a retry instead of remaining in progress',$('sync-status').textContent==='Updates may be out of date · tap to refresh');
   if($('celebrate-dialog').open)$('celebrate-dialog').close();
   const search=$('search');search.scrollIntoView();search.focus();search.value='ca';search.dispatchEvent(new Event('input',{bubbles:true}));
   await wait(()=>$('guest-search-suggestions') && !$('guest-search-suggestions').hidden);
