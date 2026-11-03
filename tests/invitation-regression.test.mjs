@@ -22,6 +22,44 @@ test("an invalid invitation does not open a previously saved family identity",()
  assert.equal(open({session:previous.session,local:previous.local}).access.token,A);
 });
 
+test("a revoked or offline replacement does not erase a remembered invitation",()=>{
+ const first=open({token:A});first.access.remember(expiry);
+ const replacement=open({token:B,session:first.session,local:first.local});
+ assert.equal(replacement.access.token,B);
+ assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,A);
+ // A server rejection clears only the rejected session; network failure does
+ // not call invalidate at all. Either way, the old remembered link survives.
+ replacement.access.invalidate();
+ assert.equal(open({local:first.local}).access.token,A);
+});
+
+test("a confirmed replacement does not erase another tab's newer remembered link",()=>{
+ const first=open({token:A});first.access.remember(expiry);
+ const replacement=open({token:B,local:first.local});
+ const newest=open({token:"C".repeat(43),local:first.local});newest.access.remember(expiry);
+ replacement.access.confirm();
+ assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,"C".repeat(43));
+});
+
+test("offline replacement can validate after reload without restoring the old identity",()=>{
+ const first=open({token:A});first.access.remember(expiry);
+ const replacement=open({token:B,session:first.session,local:first.local});
+ const retry=open({session:replacement.session,local:first.local});
+ assert.equal(retry.access.token,B);
+ retry.access.confirm();
+ assert.equal(first.local.getItem(REMEMBER_KEY),null);
+ assert.equal(open({session:retry.session,local:first.local}).access.token,B);
+});
+
+test("an offline replacement retry does not erase a newer identity saved in another tab",()=>{
+ const first=open({token:A});first.access.remember(expiry);
+ const replacement=open({token:B,session:first.session,local:first.local});
+ const newest=open({token:"C".repeat(43),local:first.local});newest.access.remember(expiry);
+ const retry=open({session:replacement.session,local:first.local});
+ retry.access.confirm();
+ assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,"C".repeat(43));
+});
+
 for(const action of ["invalidate","forget"]){
  test(`a stale tab cannot ${action} a different person's newly remembered invitation`,()=>{
    const first=open({token:A});

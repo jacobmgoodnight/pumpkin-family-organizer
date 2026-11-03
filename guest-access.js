@@ -2,6 +2,7 @@
 // A private link is a bearer capability. Never persist it without a user tap.
 export const SESSION_KEY="pumpkin-person-invite";
 export const REMEMBER_KEY="pumpkin-person-invite-remembered-v1";
+const PENDING_KEY="pumpkin-person-invite-pending-replacement-v1";
 const VALID=/^[A-Za-z0-9_-]{43}$/;
 
 export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getSession=()=>null,getPersistent=()=>null,now=()=>Date.now()}={}){
@@ -18,18 +19,37 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
  if(!remembered)store(getPersistent,"removeItem",REMEMBER_KEY);
  const incoming=valid(fromHash)?fromHash:null;
  const session=store(getSession,"getItem",SESSION_KEY);
+ let pending=null;
+ try{
+   const saved=JSON.parse(store(getSession,"getItem",PENDING_KEY)||"null");
+   if(saved&&valid(saved.token)&&valid(saved.previous))pending=saved;
+ }catch{}
  // A link was explicitly opened: if it is malformed, do not silently show a
  // previously saved family member's account in its place.
  const token=fromHash!==null?incoming:((valid(session)?session:null)||remembered?.token||null);
  if(incoming){
    store(getSession,"setItem",SESSION_KEY,incoming);
-   // Opening a different family link must never silently preserve the old person's login.
-   if(remembered&&remembered.token!==incoming){
-     store(getPersistent,"removeItem",REMEMBER_KEY);
-     remembered=null;
-   }
+   pending=remembered&&remembered.token!==incoming?{token:incoming,previous:remembered.token}:null;
+   if(pending)store(getSession,"setItem",PENDING_KEY,JSON.stringify(pending));
+   else store(getSession,"removeItem",PENDING_KEY);
  }else if(token){
    store(getSession,"setItem",SESSION_KEY,token);
+ }
+ // A newly opened link should replace a remembered identity only after the
+ // server accepts it. A revoked link or an offline visit must not erase a
+ // previously remembered invitation. Other tabs may have changed the value.
+ function confirm(){
+   if(!pending||pending.token!==token)return;
+   try{
+     const saved=JSON.parse(store(getPersistent,"getItem",REMEMBER_KEY)||"null");
+     if(saved?.token===pending.previous)store(getPersistent,"removeItem",REMEMBER_KEY);
+   }catch{}
+   try{
+     const current=JSON.parse(store(getSession,"getItem",PENDING_KEY)||"null");
+     if(current?.token===token)store(getSession,"removeItem",PENDING_KEY);
+   }catch{}
+   pending=null;
+   remembered=null;
  }
  function isRemembered(){
    try{
@@ -52,7 +72,10 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
    }catch{return {ok:false,message:"This browser cannot remember invitations. Copy your private link instead."};}
  }
  function clearCurrent(){
-   if(store(getSession,"getItem",SESSION_KEY)===token)store(getSession,"removeItem",SESSION_KEY);
+   if(store(getSession,"getItem",SESSION_KEY)===token){
+     store(getSession,"removeItem",SESSION_KEY);
+     store(getSession,"removeItem",PENDING_KEY);
+   }
    // localStorage is shared across tabs. Another tab may have remembered a
    // different person since this tab loaded, so inspect the current value.
    try{
@@ -64,5 +87,5 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
  function forget(){clearCurrent();}
  function invalidate(){clearCurrent();}
  function link(){return token?baseUrl+"#invite="+token:null;}
- return {token,remember,isRemembered,forget,invalidate,link};
+ return {token,remember,isRemembered,forget,invalidate,link,confirm};
 }

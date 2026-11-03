@@ -1,5 +1,6 @@
-import {mountSmartSuggestions} from "./search-suggestions.js?v=20261030b";
-import {createInviteAccess} from "./guest-access.js?v=20261102a";
+import {guestSearchScore} from "./guest-search.js?v=20261103b";
+import {mountSmartSuggestions} from "./search-suggestions.js?v=20261103b";
+import {createInviteAccess} from "./guest-access.js?v=20261103b";
 // Invite-only family gallery. The token is a single-person bearer capability,
 // not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
@@ -16,7 +17,10 @@ const token=access.token;
 let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
-let savedIdeas=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0,choiceGeneration=0;
+let savedIdeas=[],familyImports=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0,choiceGeneration=0;
+// Keep confirmed imports visible until a household snapshot contains them. A
+// refresh may already be in flight when the import completes.
+const pendingImports=new Map();
 const pendingChoices=new Set();
 let celebrateTimer=null;
 const notice=value=>{$("alert").textContent=value||"";};
@@ -43,8 +47,14 @@ function updateRememberStatus(){
  $("remember-device").hidden=saved;
  $("remember-status").textContent=saved?"✓ Saved on this device until the invitation expires":"";
 }
+function closeGuestDialogs(){
+ for(const id of ["preview-dialog","compare-dialog","celebrate-dialog"]){
+   const dialog=$(id);if(dialog?.open)dialog.close();
+ }
+}
 function showAccessHelp(message,retry=false){
  $("guest-app").hidden=true;
+ closeGuestDialogs();
  $("access-required").hidden=false;
  $("access-required-message").textContent=message;
  $("retry-access").hidden=!retry;
@@ -83,8 +93,11 @@ function setFamilyData(data){
  $("guest-app").hidden=false;
 }
 function prepareImports(rows){
+ familyImports=Array.isArray(rows)?rows:[];
+ for(const row of familyImports)pendingImports.delete(row.id);
+ const merged=new Map([...pendingImports,...familyImports.map(row=>[row.id,row])]);
  catalog=catalog.filter(x=>x.source!=="family");
- for(const x of rows||[]){
+ for(const x of merged.values()){
    catalog.push({id:"family:"+x.id,name:x.name||"Family import",category:x.category||"Family imports",
      source:"family",difficulty:x.difficulty||"",tags:x.tags||[],thumbnail:x.thumbnail_path||x.original_path||"",importId:x.id});
  }
@@ -102,16 +115,7 @@ function prepareIdeas(rows){
  }
  library=new Map(catalog.map(x=>[x.id,x]));
 }
-function guestScore(item,q){
- if(!q)return 0;
- const name=normalize(item.name),category=normalize(item.category),tags=(item.tags||[]).map(normalize);
- if(name===q)return 1000;
- if(name.startsWith(q))return 800;
- if(name.includes(q))return 600;
- if(tags.some(t=>t.includes(q)))return 400;
- if(category.includes(q))return 200;
- return -1;
-}
+function guestScore(item,q){return guestSearchScore(item,q);}
 // Other family profiles are saved shortlists, never a second full catalog.
 function matchesGuestSelection(item,choice,kind,q,isOwner){
  if(!isOwner&&!choice.favorite&&!choice.finalPick)return false;
@@ -133,22 +137,25 @@ function updateDiscoveryFilters(){
  fill(theme,[...new Set(catalog.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All themes",oldTheme);
  fill(difficulty,[...new Set(catalog.map(x=>x.difficulty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All difficulties",oldDifficulty);
 }
-function guestSort(items,mode,q){
- if(mode==="az")return items.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
- if(mode==="za")return items.sort((a,b)=>b.name.localeCompare(a.name,undefined,{numeric:true}));
+const guestNameCollator=new Intl.Collator(undefined,{numeric:true});
+function guestSort(items,mode,q,scores){
+ if(mode==="az")return items.sort((a,b)=>guestNameCollator.compare(a.name,b.name));
+ if(mode==="za")return items.sort((a,b)=>guestNameCollator.compare(b.name,a.name));
  if(mode==="random"){
    const rank=id=>{let h=sortRandomSeed|0;for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);return h>>>0;};
    return items.sort((a,b)=>rank(a.id)-rank(b.id));
  }
- return items.sort((a,b)=>guestScore(b,q)-guestScore(a,q)||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||a.name.localeCompare(b.name,undefined,{numeric:true}));
+ return items.sort((a,b)=>(scores?.get(b.id)??guestScore(b,q))-(scores?.get(a.id)??guestScore(a,q))||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||guestNameCollator.compare(a.name,b.name));
 }
 function filter(){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
- const theme=$("theme").value,difficulty=$("difficulty").value;
- matches=catalog.filter(item=>matchesGuestSelection(item,stateFor(item.id),kind,q,selectedIsMe())
-   &&(theme==="all"||item.category===theme)
-   &&(difficulty==="all"||item.difficulty===difficulty));
- guestSort(matches,$("sort").value,q);
+ const theme=$("theme").value,difficulty=$("difficulty").value,scores=new Map();
+ matches=catalog.filter(item=>{
+   if(!matchesGuestSelection(item,stateFor(item.id),kind,"",selectedIsMe())
+     ||(theme!=="all"&&item.category!==theme)||(difficulty!=="all"&&item.difficulty!==difficulty))return false;
+   const score=guestScore(item,q);scores.set(item.id,score);return score>=0;
+ });
+ guestSort(matches,$("sort").value,q,scores);
  visible=24;render();
 }
 function selectQuickView(kind){
@@ -456,8 +463,13 @@ async function refreshFamily(manual=false){
    }else if(manual)$("sync-status").textContent="Up to date ✓";
    else $("sync-status").textContent="Synced · checks every 20s";
  }catch(error){
-   $("sync-status").textContent="Sync paused · tap to retry";
-   if(manual)notice("Could not refresh family selections: "+error.message);
+   if(error.status===401){
+     access.invalidate();me=null;
+     showAccessHelp("This link has expired or was revoked. Ask the organizer to create and send a new private invitation.");
+   }else{
+     $("sync-status").textContent="Sync paused · tap to retry";
+     if(manual)notice("Could not refresh family selections: "+error.message);
+   }
  }finally{familyRefreshing=false;}
 }
 async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
@@ -492,12 +504,18 @@ async function importOnlineImage(row){
  $("online-status").textContent="Downloading the original to private family storage…";
  const result=await api({action:"import",ticket:row.importTicket,rightsConfirmed:true});
  if(!result.imported?.id)throw Error("The image was not imported.");
- await refreshFamily(true);
- if(!familyRefreshing){
+ pendingImports.set(result.imported.id,result.imported);
+ // Render directly from the confirmed response. A refresh can be skipped
+ // while another request is active and must not gate access to the import.
+ const known=familyImports.filter(x=>x.id!==result.imported.id);
+ prepareImports(known);
+ updateDiscoveryFilters();
+ if(selectedIsMe()){
    // Clear controls so the new design is visible, without leaving the online results behind.
    $("filter").value="family";$("theme").value="all";$("difficulty").value="all";$("search").value="";
    filter();
  }
+ void refreshFamily(true);
  $("online-status").textContent=(result.alreadyImported?"Already in family library":"Imported into private family library")+" · Open / print the saved image and check quality.";
  notice("🎃 "+(result.alreadyImported?"Already imported":"Imported successfully")+". Your family can now preview and favorite it.");
  return library.get("family:"+result.imported.id)||null;
@@ -714,22 +732,57 @@ $("forget").addEventListener("click",()=>{
 $("retry-access").addEventListener("click",()=>void start());
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
+// Browsers can navigate to another invitation on this same page without a
+// document load. Hide the old person's gallery and reinitialize with the new
+// fragment. replaceState in createInviteAccess removes the fragment without
+// firing hashchange, so this does not loop.
+window.addEventListener("hashchange",()=>{
+ if(!new URLSearchParams(location.hash.slice(1)).has("invite"))return;
+ $("guest-app").hidden=true;
+ closeGuestDialogs();
+ location.reload();
+});
 window.addEventListener("focus",()=>{if(me)void refreshFamily();});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me)void refreshFamily();});
 $("sync-status").addEventListener("click",()=>void refreshFamily(true));
 // Token-scoped reads, not unauthenticated Realtime subscriptions that bypass RLS.
 // Poll only while visible; foreground resumes immediately, keeping private links current.
 setInterval(()=>{if(me&&!document.hidden)void refreshFamily();},20000);
+async function loadSearchMetadata(){
+ // Search enrichment is optional; a slow metadata response must not block access.
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),12000);
+ try{
+   const response=await fetch("guest-search-metadata.json?v=20261103b",{cache:"force-cache",signal:controller.signal});
+   return response.ok?await response.json():{};
+ }catch{return {};}
+ finally{clearTimeout(timeout);}
+}
+function applySearchMetadata(metadata){
+ if(!me||!metadata||typeof metadata!=="object"||!Object.keys(metadata).length)return;
+ // Refresh the current catalog, including imports and ideas that may have
+ // arrived since the request started. Replacing enriched rows also invalidates
+ // the search index, which is keyed by object identity.
+ catalog=catalog.map(item=>metadata[item.id]?{...item,...metadata[item.id]}:item);
+ library=new Map(catalog.map(item=>[item.id,item]));
+ guestSuggestions.refresh();
+ const previousVisible=visible;
+ filter();
+ if(previousVisible>visible){visible=previousVisible;render();}
+}
 async function start(){
  if(!token){showAccessHelp("Open your personal link from Messages. If it expired or you're using a new phone, ask the organizer to resend or regenerate your invitation.");return;}
  if(!config?.url||!config?.publishableKey){showAccessHelp("The family gallery is temporarily unavailable. Your private invitation is still saved.",true);return;}
  try{
    notice("Opening your private family gallery…");
+   const metadataPromise=loadSearchMetadata();
    const [items,data]=await Promise.all([
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
+   access.confirm();
    catalog=items;loadFamilySnapshot(data);notice("");
+   void metadataPromise.then(applySearchMetadata);
  }catch(error){
    if(error.status===401){
      access.invalidate();

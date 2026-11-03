@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   smoke:
+    env:
+      PUMPKIN_TEST_BROWSER: /usr/bin/google-chrome
     name: Catalog, links, JS syntax and privacy smoke tests
     runs-on: ubuntu-latest
     steps:
