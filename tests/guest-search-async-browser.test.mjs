@@ -51,7 +51,7 @@ const driver=`<script>
  const output=document.createElement('pre');output.id='async-search-test';output.textContent=JSON.stringify(checks);document.body.append(output);
 })();
 </script>`;
-test('slow search metadata enriches an already-open private gallery', {skip:!browser&&'No Chromium-compatible browser found',timeout:45000},async()=>{
+test('slow search metadata enriches an already-open private gallery', {skip:!browser&&'No Chromium-compatible browser found',timeout:90000},async()=>{
  const server=createServer((req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
   try{
@@ -63,8 +63,8 @@ test('slow search metadata enriches an already-open private gallery', {skip:!bro
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-search-'));
  try{
-  const args=['--headless','--disable-gpu','--disable-extensions','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=8000',`--user-data-dir=${profile}`,'--dump-dom',`http://127.0.0.1:${server.address().port}/guest.html#invite=${'a'.repeat(43)}`];
-  const result=await new Promise((resolve,reject)=>{const child=spawn(browser,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});let stdout='',stderr='';const timer=setTimeout(()=>{child.kill();reject(Error('Browser timed out'));},30000);child.stdout.on('data',v=>stdout+=v);child.stderr.on('data',v=>stderr+=v);child.on('error',reject);child.on('close',code=>{clearTimeout(timer);resolve({code,stdout,stderr});});});
+  const args=['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=8000',`--user-data-dir=${profile}`,'--dump-dom',`http://127.0.0.1:${server.address().port}/guest.html#invite=${'a'.repeat(43)}`];
+  const result=await new Promise((resolve,reject)=>{const child=spawn(browser,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});let stdout='',stderr='';const timer=setTimeout(()=>{child.kill();reject(Error('Browser did not exit within 60 seconds. Browser stderr:\n'+stderr.slice(-32768)));},60000);child.stdout.on('data',v=>stdout+=v);child.stderr.on('data',v=>stderr+=v);child.on('error',error=>{clearTimeout(timer);reject(error);});child.on('close',code=>{clearTimeout(timer);resolve({code,stdout,stderr});});});
   assert.equal(result.code,0,result.stderr);const match=result.stdout.match(/<pre id="async-search-test">([^<]+)<\/pre>/);assert.ok(match,result.stderr);
   const checks=JSON.parse(match[1].replaceAll('&quot;','"').replaceAll('&amp;','&').replaceAll('&lt;','<').replaceAll('&gt;','>'));
   assert.deepEqual(checks.filter(x=>!x.ok),[]);

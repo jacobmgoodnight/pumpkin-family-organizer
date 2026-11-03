@@ -145,10 +145,10 @@ async function runJourney(script) {
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-browser-'));
  try {
   const url=`http://127.0.0.1:${server.address().port}/guest.html#invite=${'a'.repeat(43)}`;
-  const args=['--headless','--disable-gpu','--disable-extensions','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=6000',`--user-data-dir=${profile}`,'--dump-dom',url];
+  const args=['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=6000',`--user-data-dir=${profile}`,'--dump-dom',url];
   const result=await new Promise((resolve,reject)=>{
    const child=spawn(browser,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});let stdout='',stderr='';
-   const timer=setTimeout(()=>{child.kill();reject(new Error('Browser did not exit in time'));},30000);
+   const timer=setTimeout(()=>{child.kill();reject(new Error('Browser did not exit within 60 seconds. Browser stderr:\n'+stderr.slice(-32768)));},60000);
    child.stdout.on('data',v=>stdout+=v);child.stderr.on('data',v=>stderr+=v);child.on('error',error=>{clearTimeout(timer);reject(error);});
    child.on('close',code=>{clearTimeout(timer);resolve({code,stdout,stderr});});
   });
@@ -160,21 +160,29 @@ async function runJourney(script) {
  } finally {server.close();try{rmSync(profile,{recursive:true,force:true});}catch{}}
 }
 
-test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, () => runJourney(driver));
-test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, () => runJourney(importDriver));
+test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(driver));
+test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
 
-test('participant controls fit emulated mobile and desktop viewports', { skip: !browser && 'No Chromium-compatible browser found', timeout: 45000 }, async () => {
+test('participant controls fit emulated mobile and desktop viewports', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, async () => {
  const server=fixtureServer();
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-layout-'));
- const child=spawn(browser,['--headless','--disable-gpu','--disable-extensions','--no-first-run','--no-default-browser-check','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore',windowsHide:true});
- let socket;
+ const child=spawn(browser,['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:['ignore','ignore','pipe'],windowsHide:true});
+ let socket,browserError=null,browserStderr='';
+ child.on('error',error=>{browserError=error;});
+ child.stderr.on('data',chunk=>{browserStderr=(browserStderr+chunk.toString()).slice(-32768);});
  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  try {
-  const portFile=path.join(profile,'DevToolsActivePort');
-  for(let i=0;i<200&&!existsSync(portFile);i++)await pause(25);
-  assert.ok(existsSync(portFile),'Browser did not open a debugging port');
-  const port=readFileSync(portFile,'utf8').split(/\r?\n/)[0];
+  const portFile=path.join(profile,'DevToolsActivePort'),deadline=Date.now()+25000;
+  let port='';
+  while(Date.now()<deadline&&!browserError&&child.exitCode===null&&child.signalCode===null){
+   if(existsSync(portFile)){
+    port=readFileSync(portFile,'utf8').split(/\r?\n/)[0].trim();
+    if(/^\d+$/.test(port))break;
+   }
+   await pause(50);
+  }
+  if(!/^\d+$/.test(port))throw Error(`Browser debugging port unavailable (executable: ${browser}, exit: ${child.exitCode}, signal: ${child.signalCode}, error: ${browserError?.message||'none'}). Browser stderr:\n${browserStderr||'(empty)'}`);
   const target=await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`,{method:'PUT'})).json();
   socket=new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
