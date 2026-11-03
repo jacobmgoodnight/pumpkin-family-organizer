@@ -18,7 +18,9 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
  if(!remembered)store(getPersistent,"removeItem",REMEMBER_KEY);
  const incoming=valid(fromHash)?fromHash:null;
  const session=store(getSession,"getItem",SESSION_KEY);
- const token=incoming||(valid(session)?session:null)||remembered?.token||null;
+ // A link was explicitly opened: if it is malformed, do not silently show a
+ // previously saved family member's account in its place.
+ const token=fromHash!==null?incoming:((valid(session)?session:null)||remembered?.token||null);
  if(incoming){
    store(getSession,"setItem",SESSION_KEY,incoming);
    // Opening a different family link must never silently preserve the old person's login.
@@ -29,7 +31,12 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
  }else if(token){
    store(getSession,"setItem",SESSION_KEY,token);
  }
- function isRemembered(){return !!remembered&&remembered.token===token&&remembered.expiresAt>now();}
+ function isRemembered(){
+   try{
+     const saved=JSON.parse(store(getPersistent,"getItem",REMEMBER_KEY)||"null");
+     return !!token&&saved?.token===token&&Number.isFinite(saved.expiresAt)&&saved.expiresAt>now();
+   }catch{return false;}
+ }
  function remember(expiry){
    if(!token)return {ok:false,message:"Open your private invitation first."};
    const expiresAt=Date.parse(expiry);
@@ -44,16 +51,18 @@ export function createInviteAccess({hash="",baseUrl="",clearFragment=()=>{},getS
      return {ok:true};
    }catch{return {ok:false,message:"This browser cannot remember invitations. Copy your private link instead."};}
  }
- function forget(){
-   store(getSession,"removeItem",SESSION_KEY);
-   store(getPersistent,"removeItem",REMEMBER_KEY);
-   remembered=null;
- }
- function invalidate(){
+ function clearCurrent(){
    if(store(getSession,"getItem",SESSION_KEY)===token)store(getSession,"removeItem",SESSION_KEY);
-   if(remembered?.token===token)store(getPersistent,"removeItem",REMEMBER_KEY);
+   // localStorage is shared across tabs. Another tab may have remembered a
+   // different person since this tab loaded, so inspect the current value.
+   try{
+     const saved=JSON.parse(store(getPersistent,"getItem",REMEMBER_KEY)||"null");
+     if(token&&saved?.token===token)store(getPersistent,"removeItem",REMEMBER_KEY);
+   }catch{}
    remembered=null;
  }
+ function forget(){clearCurrent();}
+ function invalidate(){clearCurrent();}
  function link(){return token?baseUrl+"#invite="+token:null;}
  return {token,remember,isRemembered,forget,invalidate,link};
 }

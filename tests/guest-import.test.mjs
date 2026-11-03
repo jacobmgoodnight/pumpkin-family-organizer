@@ -2,40 +2,37 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {execFileSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 
 const file=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
 const edge=file("supabase/functions/pumpkin-profile-invites/index.ts");
 const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
 
-test("Google auto-import uses expiring signed result tickets and refuses client-supplied arbitrary URLs",()=>{
- assert.match(edge,/issueImportTicket\(/);
- assert.match(edge,/crypto\.subtle\.sign\("HMAC"/);
- assert.match(edge,/crypto\.subtle\.verify\("HMAC"/);
- assert.match(edge,/exp:Date\.now\(\)\+20\*60000/);
- assert.match(edge,/data\.hash!==tokenHash/);
- assert.match(edge,/data\.uid!==uid/);
- assert.match(edge,/if\(body\.rightsConfirmed!==true\)/);
- assert.match(edge,/const original=safeRemoteImage\(data\.imageUrl\)/);
- assert.doesNotMatch(edge,/fetch\(body\.imageUrl/);
+test("search results report the import pause while preserving online ideas",()=>{
+ const start=edge.indexOf("const signed=results.map(");
+ const end=edge.indexOf("return reply({query:term,provider:",start);
+ assert.ok(start>=0&&end>start);
+ const render=new Function("results",edge.slice(start,end)+"return signed;");
+ const result=render([{title:"Cat",sourceUrl:"https://example.com/cat",originalImageUrl:"https://example.com/cat.jpg"}]);
+ assert.equal(result[0].title,"Cat");
+ assert.equal(result[0].sourceUrl,"https://example.com/cat");
+ assert.equal(result[0].importTicket,null);
+ assert.equal(result[0].importUnavailableReason,"temporarily_disabled");
 });
-test("Image import is bounded and uses private storage; no silent thumbnail fallback",()=>{
- assert.match(edge,/redirect:"manual"/);
- assert.match(edge,/MAX_IMPORT_BYTES=6\*1024\*1024/);
- assert.match(edge,/AbortSignal\.timeout\(12000\)/);
- assert.match(edge,/image\/jpeg","image\/png","image\/webp/);
- assert.match(edge,/if\(total>limit\)/);
- assert.match(edge,/const jpeg=/);
- assert.match(edge,/const png=/);
- assert.match(edge,/const webp=/);
- assert.match(edge,/storage\.from\("pc-family-imports"\)/);
- assert.match(edge,/thumbnail_path:path,original_path:path/);
- assert.match(edge,/source_url:origin/);
- assert.match(edge,/alreadyImported:true/);
- assert.match(edge,/await admin\.storage\.from\("pc-family-imports"\)\.remove\(\[path\]\)/);
- assert.doesNotMatch(edge,/upsert:true/);
+test("old import requests fail closed before any download or storage write",()=>{
+ const start=edge.indexOf('if(action==="import"){');
+ const end=edge.indexOf('if(action==="idea"){',start);
+ assert.ok(start>=0&&end>start);
+ const handle=new Function("action","fail",edge.slice(start,end));
+ const result=handle("import",(message,status)=>({message,status}));
+ assert.equal(result.status,503);
+ assert.match(result.message,/temporarily unavailable/i);
+ assert.match(result.message,/save the idea/i);
+ assert.doesNotMatch(edge.slice(start,end),/fetch\(|admin\.|readImageFromRemote/);
+ assert.doesNotMatch(edge,/async function readImageFromRemote\(/);
 });
-test("Remote URL validation rejects loopback/IP and credentials before downloads",()=>{
- const begin=edge.indexOf("function safeRemoteImage("),end=edge.indexOf("async function readImageFromRemote(",begin);
+test("Original preview URL validation rejects loopback/IP and credentials",()=>{
+ const begin=edge.indexOf("function safeRemoteImage("),end=edge.indexOf("Deno.serve(",begin);
  assert.ok(begin>0&&end>begin);
  const fn=new Function("URL",edge.slice(begin,end).replace("value:unknown","value")+"return safeRemoteImage;")(URL);
  for(const url of ["http://example.org/p.png","https://127.0.0.1/p.png","https://169.254.169.254/latest","https://localhost/a.jpg","https://myhost.local/a.jpg","https://user:pass@example.com/a.jpg","https://[::1]/a.jpg"]){
@@ -66,5 +63,5 @@ test("Family visual thumbnails, background sync and compact browsing controls ex
  for(const id of ["guest-advanced","theme","difficulty","sort","surprise","clear-guest-filters","sync-status"])assert.ok(page.includes('id="'+id+'"'),id);
  assert.match(css,/\.lineup-visual/);
  assert.match(css,/\.web-results \.web-import/);
- assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../guest.js",import.meta.url))]));
 });

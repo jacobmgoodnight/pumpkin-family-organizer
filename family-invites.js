@@ -19,7 +19,18 @@ export function init({getClient,getOwner,bridge,settings}){
  status.style.cssText="font-size:12px;line-height:1.5;color:#d3e4d7";
  const rows=document.createElement("div");rows.style.cssText="display:grid;gap:10px";
  section.append(summary,intro,daysBox,rows,status);settings.append(section);
- const lastLinks=new Map();let busy=false;
+ const lastLinks=new Map();let busy=false,activeOwner=getOwner(),ownerGeneration=0;
+ function syncOwner(){
+   const current=getOwner();
+   if(current!==activeOwner){
+     activeOwner=current;ownerGeneration++;lastLinks.clear();rows.replaceChildren();
+   }
+   return current;
+ }
+ function isCurrent(owner,generation){return syncOwner()===owner&&ownerGeneration===generation;}
+ function refreshAfterOwnerChange(owner,generation){
+   if(!isCurrent(owner,generation)&&section.open&&getOwner())void view();
+ }
  const api=async body=>{
    const {data,error}=await getClient().functions.invoke("pumpkin-profile-invites",{body});
    if(error){
@@ -44,10 +55,12 @@ export function init({getClient,getOwner,bridge,settings}){
    area.remove();
  }
  async function view(){
-   if(!getOwner()||!section.open||busy)return;
+   const owner=syncOwner(),generation=ownerGeneration;
+   if(!owner||!section.open||busy)return;
    busy=true;rows.replaceChildren();notify("Loading invitation status…");
    try{
      const {invites=[]}=await api({action:"list"});
+     if(!isCurrent(owner,generation))return;
      const byPerson=new Map(invites.map(item=>[item.person_id,item]));
      for(const person of bridge.snapshot().people||[]){
        const line=document.createElement("div");line.style.cssText="border:1px solid #536958;border-radius:10px;padding:10px;background:#1b2a20;display:grid;gap:8px";
@@ -60,36 +73,41 @@ export function init({getClient,getOwner,bridge,settings}){
        }
        const buttons=document.createElement("div");buttons.style.cssText="display:flex;flex-wrap:wrap;gap:7px";
        const create=actionButton(existing?"Resend / replace link":"Create private link",async()=>{
-         if(busy||!getOwner())return;
+         if(busy||!isCurrent(owner,generation))return;
          if(existing&&!confirm("Create a fresh link for "+person.name+"? Their old link will stop working immediately, including any remembered devices. Share the new link with them."))return;
          busy=true;create.disabled=true;notify("Creating "+person.name+"'s private link…");
          try{
            const created=await api({action:"create",personId:person.id,days:Number(days.value)});
-           lastLinks.set(person.id,linkFor(created.token));
+           if(!isCurrent(owner,generation))return;
+           lastLinks.set(person.id,{id:created.id,link:linkFor(created.token)});
            notify("Private link created for "+person.name+". Share it only with the intended person.");
            await viewAfter();
-         }catch(error){notify(error.message,true);}finally{busy=false;create.disabled=false;}
+         }catch(error){if(isCurrent(owner,generation))notify(error.message,true);}finally{busy=false;create.disabled=false;refreshAfterOwnerChange(owner,generation);}
        });buttons.append(create);
-       const known=lastLinks.get(person.id);
+       const savedLink=lastLinks.get(person.id);
+       // A second organizer tab can replace or revoke this link. Do not offer
+       // a cached token unless it is still the active invitation from the API.
+       if(savedLink&&(!existing||savedLink.id!==existing.id))lastLinks.delete(person.id);
+       const known=savedLink&&existing&&savedLink.id===existing.id?savedLink.link:null;
        if(known){
-         buttons.append(actionButton("Copy link",async()=>{try{await clipboard(known);notify("Copied "+person.name+"'s link.");}catch(e){notify(e.message,true);}}));
-         if(navigator.share)buttons.append(actionButton("Share…",async()=>{try{await navigator.share({title:person.name+"'s pumpkin link",text:"Your private Goodnight pumpkin organizer link:",url:known});}catch(e){if(e.name!=="AbortError")notify("Sharing unavailable; use Copy link.",true);}}));
+         buttons.append(actionButton("Copy link",async()=>{if(!isCurrent(owner,generation))return;try{await clipboard(known);if(isCurrent(owner,generation))notify("Copied "+person.name+"'s link.");}catch(e){if(isCurrent(owner,generation))notify(e.message,true);}}));
+         if(navigator.share)buttons.append(actionButton("Share…",async()=>{if(!isCurrent(owner,generation))return;try{await navigator.share({title:person.name+"'s pumpkin link",text:"Your private Goodnight pumpkin organizer link:",url:known});}catch(e){if(isCurrent(owner,generation)&&e.name!=="AbortError")notify("Sharing unavailable; use Copy link.",true);}}));
        }
        if(existing)buttons.append(actionButton("Revoke",async()=>{
-         if(busy||!confirm("Revoke "+person.name+"'s link now?"))return;
-         busy=true;try{await api({action:"revoke",id:existing.id});lastLinks.delete(person.id);await viewAfter();notify(person.name+"'s link revoked.");}
-         catch(e){notify(e.message,true);}finally{busy=false;}
+         if(busy||!isCurrent(owner,generation)||!confirm("Revoke "+person.name+"'s link now?"))return;
+         busy=true;try{await api({action:"revoke",id:existing.id});if(!isCurrent(owner,generation))return;lastLinks.delete(person.id);await viewAfter();if(isCurrent(owner,generation))notify(person.name+"'s link revoked.");}
+         catch(e){if(isCurrent(owner,generation))notify(e.message,true);}finally{busy=false;refreshAfterOwnerChange(owner,generation);}
        }));
        line.append(buttons);rows.append(line);
      }
      if(!invites.length)notify("No active links yet. Create a private link for the person you'd like to invite.");
      else if(!status.textContent.includes("created")&&!status.textContent.includes("revoked"))notify("Links are unique to each person. Replacing or revoking immediately disables the previous link.");
-   }catch(error){notify(error.message,true);}
-   finally{busy=false;}
+   }catch(error){if(isCurrent(owner,generation))notify(error.message,true);}
+   finally{busy=false;refreshAfterOwnerChange(owner,generation);}
  }
  async function viewAfter(){busy=false;await view();}
  section.addEventListener("toggle",()=>{if(section.open)void view();});
- window.addEventListener("pumpkin:cloudready",()=>{if(section.open)void view();});
- window.addEventListener("pumpkin:cloudsignedout",()=>{lastLinks.clear();section.open=false;rows.replaceChildren();});
+ window.addEventListener("pumpkin:cloudready",()=>{syncOwner();if(section.open)void view();});
+ window.addEventListener("pumpkin:cloudsignedout",()=>{syncOwner();lastLinks.clear();section.open=false;rows.replaceChildren();});
  window.addEventListener("pumpkin:statechange",()=>{if(section.open&&!busy)void view();});
 }
