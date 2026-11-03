@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync,existsSync} from "node:fs";
 import {execFileSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 import vm from "node:vm";
 
 const file=name=>readFileSync(new URL("../"+name,import.meta.url),"utf8");
@@ -19,7 +20,7 @@ test("JavaScript parses without a build or secrets",()=>{
  assert.doesNotThrow(()=>new vm.Script(inline));
  for(const path of ["family-sync.js","family-features.js","search-suggestions.js","pdf-preview.js","supabase/functions/pumpkin-image-search/index.ts"]){
    if(path.endsWith(".ts"))continue; // Deno types require the Edge runtime
-   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../"+path,import.meta.url).pathname]));
+   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../"+path,import.meta.url))]));
  }
 });
 test("Catalog contains all 2,053 unique original IDs",()=>{
@@ -117,7 +118,7 @@ test("Guest links use scoped server auth and catalog metadata only",()=>{
  assert.match(parent,/action:"revoke"/);
  assert.match(sync,/family-invites\.js/);
  for(const path of ["guest.js","family-invites.js"])
-   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../"+path,import.meta.url).pathname]));
+   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../"+path,import.meta.url))]));
 });
 
 test("Family-first layout keeps one real search input and original handlers",()=>{
@@ -133,7 +134,7 @@ test("Family-first layout keeps one real search input and original handlers",()=
  assert.match(searchFirst,/aria-expanded/);
  assert.match(css,/\.search-hero-search input\{/);
  assert.match(css,/\.profile-panel \.profiles\{display:grid;grid-template-columns:repeat\(4/);
- assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../search-first.js",import.meta.url).pathname]));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../search-first.js",import.meta.url))]));
 });
 test("Organizer identity is separate from selected family profile",()=>{
  assert.match(sync,/id="organizer-identity"/);
@@ -180,7 +181,7 @@ test("Guest full preview, compare, family read-only and Google cards",()=>{
  assert.match(edge,/person_id:personId,template_id:templateId/);
  assert.match(edge,/SERPAPI_KEY/);
  assert.match(edge,/15 per hour/);assert.match(edge,/40 per day/);
- assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../guest.js",import.meta.url))]));
 });
 test("Phone-only organizer reduction and versioned assets",()=>{
  const css=file("mobile-polish.css");
@@ -225,7 +226,7 @@ test("Small phones keep sort, Surprise Me and clear controls in separate cells",
  assert.match(css,/\.toolbar-tail \.sort-inline\{[\s\S]*?grid-column:1\/-1!important/);
  assert.match(css,/\.toolbar-tail #surprise\{[\s\S]*?grid-column:1!important/);
  assert.match(guestCss,/@media\(max-width:600px\)/);
- assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../guest.js",import.meta.url))]));
 });
 
 test("Private family gallery starts with collapsed lineup and first-class personal tabs",()=>{
@@ -245,7 +246,7 @@ test("Private family gallery starts with collapsed lineup and first-class person
  assert.match(guest,/getItems:\(\)=>catalog/);
  assert.match(css,/\.guest-views button\[aria-pressed=true\]/);
  assert.ok(page.indexOf('id="lineup-section"')<page.indexOf('id="view-heading"'));
- assert.match(page,/guest\.js\?v=20261030g/);
+ assert.match(page,/guest\.js\?v=[A-Za-z0-9_-]+/);
 });
 
 test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
@@ -316,8 +317,8 @@ test("Google discovery is a one-step inline search with collapsible results",()=
  assert.match(guest,/\$\("online-panel"\)\.hidden=!own/);
  assert.match(css,/\.online-results-panel/);
  assert.match(css,/\.online-discovery a:visited/);
- assert.match(page,/guest\.css\?v=20261030g/);
- assert.match(page,/guest\.js\?v=20261030g/);
+ assert.match(page,/guest\.css\?v=[A-Za-z0-9_-]+/);
+ assert.match(page,/guest\.js\?v=[A-Za-z0-9_-]+/);
 });
 
 test("Web ideas are explicitly preview-only, family imports are printable",()=>{

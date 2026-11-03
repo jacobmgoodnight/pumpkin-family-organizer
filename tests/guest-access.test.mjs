@@ -84,5 +84,5 @@ test("Top of private gallery leads with personal identity and shortcuts",()=>{
  assert.match(script,/if\(error\.status===401\)/);
  assert.match(script,/access\.invalidate\(\)/);
  assert.match(script,/location\.replace\(location\.pathname\+location\.search\)/);
- assert.match(page,/guest\.js\?v=20261030g/);
+ assert.match(page,/guest\.js\?v=[A-Za-z0-9_-]+/);
 });

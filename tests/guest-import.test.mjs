@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {execFileSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 
 const file=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
 const edge=file("supabase/functions/pumpkin-profile-invites/index.ts");
@@ -66,5 +67,5 @@ test("Family visual thumbnails, background sync and compact browsing controls ex
  for(const id of ["guest-advanced","theme","difficulty","sort","surprise","clear-guest-filters","sync-status"])assert.ok(page.includes('id="'+id+'"'),id);
  assert.match(css,/\.lineup-visual/);
  assert.match(css,/\.web-results \.web-import/);
- assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",new URL("../guest.js",import.meta.url).pathname]));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",fileURLToPath(new URL("../guest.js",import.meta.url))]));
 });

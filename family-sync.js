@@ -351,7 +351,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    try{
      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm');
      client=mod.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-     import('./family-invites.js?v=20261029c').then(module=>module.init({
+     import('./family-invites.js?v=20261102a').then(module=>module.init({
        getClient:()=>client,getOwner:()=>owner,bridge,settings:accountSettings
      })).catch(error=>console.warn("Family invitation manager unavailable",error));
      async function onSession(session){

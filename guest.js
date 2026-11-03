@@ -1,5 +1,5 @@
 import {mountSmartSuggestions} from "./search-suggestions.js?v=20261030b";
-import {createInviteAccess} from "./guest-access.js?v=20261030g";
+import {createInviteAccess} from "./guest-access.js?v=20261102a";
 // Invite-only family gallery. The token is a single-person bearer capability,
 // not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
@@ -16,7 +16,8 @@ const token=access.token;
 let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=new Map();
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
-let savedIdeas=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0;
+let savedIdeas=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0,choiceGeneration=0;
+const pendingChoices=new Set();
 let celebrateTimer=null;
 const notice=value=>{$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
@@ -151,13 +152,14 @@ function filter(){
  visible=24;render();
 }
 function selectQuickView(kind){
- // Quick shortcuts always return to your personal list, without retaining a
- // previous search term that could make your favorites seem to disappear.
+ // Quick shortcuts return to the complete personal list, including when
+ // advanced filters are collapsed and no longer visible.
  if(!me)return;
  viewPerson=me.personId;
  $("person-view").value=viewPerson;
  $("filter").value=kind;
  $("search").value="";
+ $("theme").value="all";$("difficulty").value="all";
  filter();
 }
 function viewPersonSelection(personId){
@@ -217,18 +219,19 @@ function createImage(item,click){
 }
 async function saveChoice(item,field){
  if(!selectedIsMe()){notice("This is another person's list. You can view and compare, but not change their picks.");return;}
+ if(pendingChoices.has(item.id))return;
  const person=me.personId,map=familyChoices.get(person);
  const before=stateFor(item.id,person),next={...before,[field]:!before[field]};
  if(field==="favorite"&&!next.favorite)next.finalPick=false;
  if(field==="finalPick"&&next.finalPick)next.favorite=true;
- choiceWrites++;map.set(item.id,next);render();renderLineup();refreshModal();
+ pendingChoices.add(item.id);choiceWrites++;choiceGeneration++;map.set(item.id,next);render();renderLineup();refreshModal();
  try{
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
    if(field==="finalPick"&&!before.finalPick&&res.finalPick)celebratePick(item);
  }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
- choiceWrites=Math.max(0,choiceWrites-1);
+ pendingChoices.delete(item.id);choiceWrites=Math.max(0,choiceWrites-1);
  render();renderLineup();refreshModal();
 }
 // The same pumpkin celebration as the main organizer, after a confirmed save.
@@ -257,7 +260,7 @@ function actionButton(item,field){
  const state=stateFor(item.id),own=selectedIsMe();
  const text=field==="favorite"?(state.favorite?"♥ Saved":"♡ Save"):(state.finalPick?"🎃 Picked":"🎃 Pick");
  const b=button(text,()=>saveChoice(item,field));
- b.disabled=!own;b.setAttribute("aria-pressed",String(field==="favorite"?state.favorite:state.finalPick));
+ b.disabled=!own||pendingChoices.has(item.id);b.setAttribute("aria-pressed",String(field==="favorite"?state.favorite:state.finalPick));
  b.title=own?text:"Read-only: "+people.find(x=>x.id===viewPerson)?.name+"'s selections";return b;
 }
 function itemActions(item){
@@ -335,7 +338,7 @@ function refreshModal(){
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
  if(item.importId)actions.append(button("📄 Open / print image",()=>printable(item)));
  if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
- else{const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
+ else if(item.source!=="family"){const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
 }
 function showCompare(){
  const host=$("compare-grid");host.replaceChildren();
@@ -438,10 +441,14 @@ function loadFamilySnapshot(data){
 async function refreshFamily(manual=false){
  if(familyRefreshing||choiceWrites||!me||(!manual&&document.hidden))return;
  familyRefreshing=true;
+ const generation=choiceGeneration;
  if(manual)$("sync-status").textContent="Checking for updates…";
  try{
    const updated=await api({action:"guest"});
-   if(choiceWrites)return;
+   if(choiceWrites||generation!==choiceGeneration){
+     $("sync-status").textContent="Updates may be out of date · tap to refresh";
+     return;
+   }
    const stamp=familyFingerprint(updated);
    if(stamp!==lastFamilyFingerprint){
      loadFamilySnapshot(updated);
@@ -465,8 +472,11 @@ async function saveOnlineIdea(row,{favorite=false,compare=false}={}){
  const item=library.get("web:"+idea.id);
  if(favorite){
    const prior=stateFor(item.id,me.personId);
-   const response=await api({action:"choice",templateId:item.id,favorite:true,finalPick:!!prior.finalPick});
-   familyChoices.get(me.personId).set(item.id,{favorite:!!response.favorite,finalPick:!!response.finalPick});
+   pendingChoices.add(item.id);choiceWrites++;choiceGeneration++;
+   try{
+     const response=await api({action:"choice",templateId:item.id,favorite:true,finalPick:!!prior.finalPick});
+     familyChoices.get(me.personId).set(item.id,{favorite:!!response.favorite,finalPick:!!response.finalPick});
+   }finally{pendingChoices.delete(item.id);choiceWrites=Math.max(0,choiceWrites-1);}
    // Saving your own favorite while viewing a sibling must never edit their selection.
    if(!selectedIsMe()){viewPerson=me.personId;$("person-view").value=me.personId;}
  }
