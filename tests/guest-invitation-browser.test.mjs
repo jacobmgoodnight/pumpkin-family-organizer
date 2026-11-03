@@ -16,7 +16,7 @@ const A='a'.repeat(43),B='b'.repeat(43),C='c'.repeat(43);
 const SESSION='pumpkin-person-invite',REMEMBER='pumpkin-person-invite-remembered-v1';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-test('invitation recovery keeps the remembered person through failed replacement links', {skip:!browser&&'No Chromium-compatible browser found',timeout:60000},async()=>{
+test('invitation recovery keeps the remembered person through failed replacement links', {skip:!browser&&'No Chromium-compatible browser found',timeout:120000},async()=>{
  let aStatus=200,bStatus=401,holdB=false,releaseB;const calls=[];
  const server=createServer(async(req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
@@ -42,13 +42,25 @@ test('invitation recovery keeps the remembered person through failed replacement
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const origin=`http://127.0.0.1:${server.address().port}`;
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-invitation-'));
- const child=spawn(browser,['--headless','--disable-gpu','--disable-extensions','--no-first-run','--no-default-browser-check','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore',windowsHide:true});
+ const child=spawn(browser,['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:['ignore','ignore','pipe'],windowsHide:true});
+ let browserError=null,browserStderr='';
+ child.on('error',error=>{browserError=error;});
+ child.stderr.on('data',chunk=>{browserStderr=(browserStderr+chunk.toString()).slice(-32768);});
  let socket,otherSocket;
  try{
-  const portFile=path.join(profile,'DevToolsActivePort');
-  for(let i=0;i<200&&!existsSync(portFile);i++)await sleep(25);
-  assert.ok(existsSync(portFile),'Browser did not open a debugging port');
-  const port=readFileSync(portFile,'utf8').split(/\r?\n/)[0];
+  const portFile=path.join(profile,'DevToolsActivePort'),deadline=Date.now()+25000;
+  let port='';
+  // Concurrent browser launches on shared CI runners can take longer than a
+  // few seconds. Detect early exit separately from a slow startup and keep
+  // the browser's diagnostics if it never becomes ready.
+  while(Date.now()<deadline&&!browserError&&child.exitCode===null&&child.signalCode===null){
+   if(existsSync(portFile)){
+    port=readFileSync(portFile,'utf8').split(/\r?\n/)[0].trim();
+    if(/^\d+$/.test(port))break;
+   }
+   await sleep(50);
+  }
+  if(!/^\d+$/.test(port))throw Error(`Browser debugging port unavailable (executable: ${browser}, exit: ${child.exitCode}, signal: ${child.signalCode}, error: ${browserError?.message||'none'}). Browser stderr:\n${browserStderr||'(empty)'}`);
   const target=await(await fetch(`http://127.0.0.1:${port}/json/new?about:blank`,{method:'PUT'})).json();
   socket=new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
