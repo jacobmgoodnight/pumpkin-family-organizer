@@ -238,6 +238,7 @@ body.cloud-gated main.workspace, body.cloud-gated #sticky-quick-search{display:n
 .family-print-item{display:flex;gap:12px;align-items:center;break-inside:avoid;min-width:0}
 .family-print-preview{width:86px;height:104px;object-fit:contain;flex:none;border-radius:7px}
 .family-print-info{display:flex;flex-direction:column;gap:5px;min-width:0;overflow-wrap:anywhere}
+.family-print-status{font-size:12px;font-weight:700;color:#f3c88d}.family-print-explainer{font-size:12px;color:#bfcbbb}.print-queue-counts{margin:12px 0;padding:12px;border:1px solid #58735e;border-radius:10px;background:#1a2b21}.print-queue-counts p{margin:4px 0}
 @media(max-width:520px){.family-print-item{gap:8px}.family-print-preview{width:65px;height:80px}}
 @media print{@page{margin:.5in}body *{visibility:hidden!important}
 #summary,#summary *{visibility:visible!important}
@@ -265,7 +266,7 @@ body.cloud-gated main.workspace, body.cloud-gated #sticky-quick-search{display:n
 </details>
 <div class="toolbar-tail"><div class="stat" id="count" aria-live="polite"></div><button class="button small quiet" type="button" id="search-online" hidden>••• Find more designs online</button><div class="top-actions"><label class="sort-inline" for="sort"><span>Sort by</span><select id="sort" aria-label="Sort templates"><option value="best">Best match</option><option value="az">Name A–Z</option><option value="za">Name Z–A</option><option value="shuffle">Shuffle order</option><option value="recent">Recently favorited</option></select></label><button class="button small surprise" id="surprise" type="button" title="Open a random design that matches your current filters" aria-label="Surprise me with a random design">🎲 Surprise</button><button class="button small quiet" id="clear-filters" title="Reset search and filters" aria-label="Clear all filters">Clear</button></div></div><section class="compare-panel" id="compare-panel" aria-label="Compare favorite designs" hidden><div><strong>Compare your favorites</strong><p>Select 2 or 3 designs below to review them in a larger side-by-side view.</p></div><div class="compare-actions"><span id="compare-count" aria-live="polite">0 selected</span><button class="button primary" id="compare-open" disabled>Compare side by side</button><button class="button quiet" id="compare-clear" disabled>Clear</button></div></section><div class="grid" id="grid"></div><div class="empty" id="empty" hidden><h3>No matching templates</h3><p id="empty-text">Try broader search terms or clear a filter.</p><button class="button" id="empty-clear">Browse all templates</button></div><button class="button loadmore" id="loadmore" hidden>Show more templates</button>
 </div>
-<section class="overview" id="summary" hidden><h2 class="print-heading" style="display:none">Goodnight Family · Pumpkin Carving Picks</h2><div class="section-top"><div><h2>Everyone's final selections</h2><p class="muted" style="margin:2px 0 0">See which patterns each person chose. Open individual source files to print.</p></div><div class="top-actions"><button class="button" id="print-summary">Print lineup</button><button class="button quiet" id="download-summary">Export lineup</button></div></div><div id="summary-list"></div></section>
+<section class="overview" id="summary" hidden><h2 class="print-heading" style="display:none">Goodnight Family · Pumpkin Carving Picks</h2><div class="section-top"><div><h2>Family print queue</h2><p class="muted" style="margin:2px 0 0">Your family's final picks, with the next step for each original.</p></div><div class="top-actions"><button class="button" id="print-summary">Print lineup (not patterns)</button><button class="button quiet" id="download-summary">Export lineup</button></div></div><div id="print-queue-counts" class="print-queue-counts" aria-live="polite"></div><div id="summary-list"></div></section>
 <div class="info-box storage-only"><p id="storage-status"></p></div>
 </main>
 <dialog class="dialog settings-dialog" id="settings-dialog" aria-labelledby="settings-title"><div class="panel-top"><h2 id="settings-title">⚙ Settings &amp; backups</h2><button class="button small quiet" id="settings-close" type="button">Close ✕</button></div>
@@ -437,7 +438,12 @@ function findVisible(){const query=getQueryTerms();const source=$('source').valu
  const score=searchScore(x,query.terms,query.raw);if(!score)return false;scores.set(x.id,score);return true;
  });return sortVisible(matches,scores)}
 function fileHref(path){return /^https:\/\//.test(path)?path:path.split('/').map(encodeURIComponent).join('/')}
+function openFamilyOriginal(x){
+ if(typeof window.PUMPKIN_OPEN_FAMILY_ORIGINAL==='function')window.PUMPKIN_OPEN_FAMILY_ORIGINAL(x.cloud_id);
+ else alert('Connect the parent account to open this family original.');
+}
 function originalAction(x){
+ if(x?.source==='family'&&x.cloud_id&&x.hasOriginal){const b=createElement('button','button small','Open original ↗');b.type='button';b.addEventListener('click',()=>openFamilyOriginal(x));return b;}
  if(!x?.path)return createElement('span','muted','Preview only · No printable original');
  const isCloud=x.path.startsWith('https://');
  const a=createElement('a','pdf',isCloud?'Open printable ↗':'Find original ↗');
@@ -514,16 +520,23 @@ function renderPreview(){
  $('preview-source').textContent=current.source==='zombie'?'★ ZOMBIE PUMPKINS · CURATED':current.source==='family'?'♥ FAMILY LIBRARY · SHARED':'ADDITIONAL COLLECTION';
  $('preview-category').textContent='Theme: '+current.theme;
  const visualDetails=VISUAL_CAPTIONS[current.id];$('preview-visual-caption').hidden=!visualDetails;$('preview-visual-caption').textContent=visualDetails?'Visual description ('+visualDetails.confidence+' confidence): '+visualDetails.description:'';
- $('preview-difficulty').hidden=current.source==='zombie'&&!current.difficulty;
- $('preview-difficulty').textContent='Difficulty: '+(current.difficulty||'Not rated')+(current.source==='zombie'&&current.difficulty?' · Publisher rating':'');
+ $('preview-difficulty').hidden=false;
+ $('preview-difficulty').textContent=!current.difficulty?'Difficulty: Not rated':
+  current.source==='family'?'Family-entered difficulty: '+current.difficulty:
+  current.source==='extra'&&/^Level [1-5]$/.test(current.difficulty)?'Collection level: '+current.difficulty:
+  'Catalog difficulty: '+current.difficulty+' · source not verified';
  $('preview-tags').textContent='Original category: '+current.category+(current.tags.length?' · '+(current.source==='zombie'?'Original subcollection: ':'Source folder: ')+current.tags.join(' · '):'');
  const keywordList=[...new Set([...(current.keywords||[]),...((VISUAL_CAPTIONS[current.id]||{}).tags||[])])];$('preview-keywords').hidden=!keywordList.length;$('preview-keywords').textContent=keywordList.length?'Search keywords: '+keywordList.join(' · '):'';
  const otherLabel=otherPicksLabel(current.id);$('preview-others').hidden=!otherLabel;$('preview-others').textContent=otherLabel;
  const favorite=$('preview-favorite');const isFavorite=favorites.has(current.id);
  favorite.textContent=isFavorite?'♥ Saved to favorites':'♡ Save to my favorites';favorite.setAttribute('aria-pressed',String(isFavorite));
  favorite.setAttribute('aria-label',(isFavorite?'Remove from':'Save to')+' '+currentPerson().name+' favorites: '+current.name);
- $('preview-original').hidden=!current.path;
- if(current.path){
+ const familyOriginal=current.source==='family'&&current.cloud_id&&current.hasOriginal;
+ $('preview-original').hidden=!current.path&&!familyOriginal;
+ if(familyOriginal){
+  $('preview-original').href='#';$('preview-original').textContent='Open original ↗';
+  delete $('preview-original').dataset.originalId;$('preview-original').removeAttribute('target');
+ }else if(current.path){
   const privateLink=current.path.startsWith('https://');
   $('preview-original').href=privateLink?current.path:'#';
   $('preview-original').textContent=privateLink?'Open printable ↗':'Find original ↗';
@@ -535,10 +548,11 @@ function renderPreview(){
  $('preview-prev').disabled=idx<=0;$('preview-next').disabled=idx<0||idx>=list.length-1;
  $('preview-position').textContent=idx<0?'No longer in this view':(idx+1)+' of '+list.length+(previewContext==='compare'?' compared':'');
 }
+$('preview-original').addEventListener('click',e=>{const x=allData().find(item=>item.id===previewID);if(x?.source==='family'&&x.cloud_id&&x.hasOriginal){e.preventDefault();openFamilyOriginal(x)}});
 function movePreview(delta){const list=previewItems(),idx=list.findIndex(x=>x.id===previewID);const next=idx+delta;if(next>=0&&next<list.length){previewID=list[next].id;renderPreview()}}
 function renderSummary(){
  const host=$('summary-list');host.replaceChildren();
- const catalog=new Map(allData().map(x=>[x.id,x]));let total=0;
+ const catalog=new Map(allData().map(x=>[x.id,x]));let total=0,saved=0,needed=0;
  for(const person of app.people){
   const ids=app.picks[person.id]||[],section=createElement('section','overview-member');
   section.append(createElement('h3','',person.name+' — '+ids.length+' final '+(ids.length===1?'pick':'picks')));
@@ -546,14 +560,19 @@ function renderSummary(){
   if(!ids.length)row.append(createElement('span','muted','No final design chosen yet'));
   for(const id of ids){
    const x=catalog.get(id),entry=createElement('div','overview-item family-print-item');
-   if(!x){entry.textContent='Unavailable template ('+id+')';row.append(entry);continue;}
+   if(!x){needed++;entry.textContent='Original needed · This selection is unavailable. Connect the family account or restore the original catalog.';row.append(entry);continue;}
    const img=document.createElement('img');img.src=x.thumbnail;img.alt=x.name+' carving preview';img.loading='lazy';img.className='family-print-preview';
    const info=createElement('div','family-print-info');
-   info.append(createElement('strong','',x.name),createElement('span','muted',x.source==='family'?'♥ Family import':x.source==='zombie'?'★ Zombie Pumpkins':'Additional collection'),originalAction(x));
+   const familySaved=x.source==='family'&&x.cloud_id&&x.hasOriginal;
+   if(familySaved)saved++;else needed++;
+   const status=familySaved?'Saved original · open to check':'Original needed';
+   const help=familySaved?'Open the saved file and check its quality before printing.':x.path?'Find the original on the computer or drive where your library is stored.':'Find or import a printable original.';
+   info.append(createElement('strong','',x.name),createElement('span','muted',x.source==='family'?'♥ Family import':x.source==='zombie'?'★ Zombie Pumpkins':'Additional collection'),createElement('span','family-print-status',status),createElement('span','family-print-explainer',help),originalAction(x));
    entry.append(img,info);row.append(entry);
   }
   section.append(row);host.append(section);total+=ids.length;
  }
+ const counts=$('print-queue-counts');counts.replaceChildren(createElement('strong','',total+' final '+(total===1?'pick':'picks')),createElement('p','',saved+' saved original'+(saved===1?'':'s')+' to check · '+needed+' original'+(needed===1?'':'s')+' needed'),createElement('p','muted','Open each original and use its print controls. Printing the lineup only prints this list and its previews.'));
  if(!total)host.prepend(createElement('p','muted','No final design selected. Save favorites, compare, and choose a pumpkin.'));
 }
 function renderAll(){syncStickySearch();syncDifficultyFilter();$('sort').querySelector('[value=recent]').hidden=view!=='favorites';if(view!=='favorites'&&$('sort').value==='recent')$('sort').value='az';renderProfiles();updateHeader();$('catalog-area').hidden=view==='summary';$('summary').hidden=view!=='summary';if(view==='summary')renderSummary();else renderGallery();updateStickyVisibility()}
@@ -581,7 +600,7 @@ function togglePick(id){
 }
 function clearFilters(){if(queryTimer)clearTimeout(queryTimer);$('search').value='';$('source').value='';$('category').value='';$('difficulty').value='';visible=96;if(view==='summary')view='all';renderFilters();renderAll()}
 function download(name,text,format){const a=document.createElement('a'),blob=new Blob([text],{type:format||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
-function readableList(finalOnly=false){const lookup=new Map(allData().map(x=>[x.id,x]));const text=['GOODNIGHT FAMILY · PUMPKIN CARVING SELECTIONS','',new Date().toLocaleDateString(),''];for(const person of app.people){text.push(person.name,'='.repeat(person.name.length));for(const [title,kind] of (finalOnly?[['Final picks','picks']]:[['Final picks','picks'],['Favorites','favorites']])){text.push(title+':');const ids=app[kind][person.id]||[];if(!ids.length)text.push('  (none)');for(const id of ids){const x=lookup.get(id);text.push('  • '+(x?x.name+' | '+x.category+' | '+x.path:'Unavailable template: '+id))}text.push('')}text.push('')}return text.join('\n')}
+function readableList(finalOnly=false){const lookup=new Map(allData().map(x=>[x.id,x]));const text=['GOODNIGHT FAMILY · PUMPKIN CARVING SELECTIONS','',new Date().toLocaleDateString(),''];for(const person of app.people){text.push(person.name,'='.repeat(person.name.length));for(const [title,kind] of (finalOnly?[['Final picks','picks']]:[['Final picks','picks'],['Favorites','favorites']])){text.push(title+':');const ids=app[kind][person.id]||[];if(!ids.length)text.push('  (none)');for(const id of ids){const x=lookup.get(id);text.push('  • '+(x?x.name+' | '+x.category+' | '+(x.path||(x.hasOriginal?'Saved in family library':'No printable original')):'Unavailable template: '+id))}text.push('')}text.push('')}return text.join('\n')}
 function exportBackup(){const payload={format:'goodnight-pumpkin-family-backup',version:2,exportedAt:new Date().toISOString(),state:app};download('Pumpkin_Family_Backup.json',JSON.stringify(payload,null,2),'application/json')}
 function restoreBackup(file){if(!file)return;file.text().then(s=>{const parsed=JSON.parse(s);if(parsed.format!=='goodnight-pumpkin-family-backup'||parsed.version!==2||!isObj(parsed.state))throw new Error('Not a supported family backup');if(!confirm('Restoring while signed in also syncs these profiles and selections to the cloud, possibly changing choices on other devices. Back up current selections first. Pattern files are unchanged. Continue?'))return;app=normalizeApp(parsed.state);saveApp();view='all';visible=96;renderAll();alert('Family backup restored.')}).catch(e=>alert('Could not restore backup: '+e.message));$('backup-input').value=''}
 function showPeople(){
@@ -640,7 +659,7 @@ window.PUMPKIN_FAMILY_BRIDGE = {
 };
 renderFilters();renderAll();if(!persistent)$('storage-note').hidden=false;$('storage-status').textContent='Favorites and final picks are saved in this browser when local-file storage is available. Keep a JSON backup before moving this file or changing browsers.';
 </script>
-<script type="module" src="family-sync.js?v=20261102a"></script>
+<script type="module" src="family-sync.js?v=20261104a"></script>
 <script type="module" src="search-first.js?v=20261103c"></script>
 </body>
 </html>

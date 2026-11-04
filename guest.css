@@ -212,3 +212,6 @@
  .guest-home{grid-template-columns:1fr}
  .guest-home .guest-view-picker{grid-column:1}
 }
+.preview-details{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 12px;margin:12px 0;font-size:13px}
+.preview-details dt{color:#b9cbbc;font-weight:700}
+.preview-details dd{margin:0;overflow-wrap:anywhere}
