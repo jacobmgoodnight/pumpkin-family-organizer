@@ -222,6 +222,49 @@ test('participant shortcuts and search work in a browser', { skip: !browser && '
 test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
 test('family reports and approved corrections work in the private gallery', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(feedbackDriver));
 
+const favoritesVisibilityDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out waiting for page');};
+ const $=id=>document.getElementById(id);
+ // Configure before the deferred module reads the first household snapshot.
+ household.familyChoices=[];household.people.push({id:'other',name:'Other'});
+ try{
+  await wait(()=>!$('guest-app').hidden&&$('grid').children.length);
+  const favorite=$('quick-favorites'),search=$('search');
+  const input=value=>{search.value=value;search.dispatchEvent(new Event('input',{bubbles:true}));};
+  const cardButtons=()=>[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Cat Face'))?.querySelectorAll('button');
+  const cardButton=name=>[...(cardButtons()||[])].find(b=>b.textContent.includes(name));
+  check('empty shortlist is initially hidden',favorite.hidden);
+  const home=document.querySelector('.guest-home').getBoundingClientRect(), searchBox=$('guest-search').getBoundingClientRect(), nav=$('guest-views').getBoundingClientRect();
+  const all=$('quick-all').getBoundingClientRect(),picks=$('quick-picks').getBoundingClientRect();
+  check('search appears before shortcut controls',home.bottom<=searchBox.top&&searchBox.bottom<=nav.top);
+  check('remaining shortcuts fill the row when favorites is hidden',Math.abs(all.left-nav.left)<2&&Math.abs(picks.right-nav.right)<2&&Math.abs(all.width-picks.width)<2);
+  input('   ');check('whitespace alone does not show favorites',favorite.hidden);
+  input('cat');check('typing a search reveals favorites',!favorite.hidden);
+  favorite.click();check('empty active favorites remains visible after search clears',!favorite.hidden&&favorite.getAttribute('aria-pressed')==='true'&&search.value==='');
+  $('quick-all').click();check('leaving the empty shortlist hides its shortcut',favorite.hidden);
+  window.__deferChoice=true;cardButton('Save').click();await wait(()=>window.__resolveChoice);
+  check('saving reveals shortcut immediately',!favorite.hidden&&$('quick-favorites-count').textContent==='1');
+  window.__resolveChoice();await wait(()=>cardButton('Saved')&&!cardButton('Saved').disabled);
+  favorite.click();cardButton('Saved').click();await wait(()=>$('quick-favorites-count').textContent==='0');
+  check('removing last favorite does not hide active view',!favorite.hidden&&favorite.getAttribute('aria-pressed')==='true');
+  $('quick-all').click();check('shortcut hides after leaving an emptied view',favorite.hidden);
+  await wait(()=>cardButton('Save')&&!cardButton('Save').disabled);
+  household.familyChoices=[{personId:'me',templateId:'ghost',favorite:true,finalPick:false}];
+  $('sync-status').click();await wait(()=>$('quick-favorites-count').textContent==='1');
+  check('family refresh reveals newly saved favorite',!favorite.hidden);
+  $('person-view').value='other';$('person-view').dispatchEvent(new Event('change',{bubbles:true}));
+  check('other-person view hides personal shortcuts and search',$('guest-views').hidden&&$('guest-search').hidden);
+  $('back-to-me').click();check('returning restores personal search and favorite shortcut',!$('guest-search').hidden&&!favorite.hidden);
+  household.familyChoices=[];$('sync-status').click();await wait(()=>$('quick-favorites-count').textContent==='0');
+  check('family refresh removes shortcut when last favorite disappears',favorite.hidden);
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('favorites shortcut follows searches and live family choices', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(favoritesVisibilityDriver));
+
 const detailsDriver = `<script>
 (async()=>{
  const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
@@ -348,6 +391,11 @@ test('participant controls fit emulated mobile and desktop viewports', { skip: !
     const controls=ids.map(rect);return {viewport:window.innerWidth,available:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth,controls};
    })()`);
    assert.equal(layout.viewport,width,`Expected ${width}px viewport`);
+   const searchBox=layout.controls.find(x=>x.id==='search');
+   for(const id of ['quick-all','family-lineup','filter']){
+    const control=layout.controls.find(x=>x.id===id);
+    assert.ok(searchBox.bottom<=control.top,`${width}px search should precede ${id}`);
+   }
    const overflowing=layout.controls.filter(r=>r.width<=0||r.left < -1||r.right > layout.available+1);
    assert.deepEqual(overflowing,[],`${width}px controls overflow: ${JSON.stringify(overflowing)}`);
    assert.ok(layout.scrollWidth<=layout.available+1,`${width}px page scrolls horizontally (${layout.scrollWidth}px)`);
