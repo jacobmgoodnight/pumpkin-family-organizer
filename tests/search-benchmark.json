@@ -1,0 +1,113 @@
+[
+  {
+    "query": "ghost",
+    "relevant": [
+      "Ghost Pirate"
+    ],
+    "irrelevant": [
+      "Abraham Lincoln",
+      "Bald Eagle"
+    ],
+    "reason": "Lincoln and the eagle belong to the Summer Spirits collection; its name does not make them ghosts."
+  },
+  {
+    "query": "witch",
+    "relevant": [
+      "Snow White Witch",
+      "Wicked Witch of the West"
+    ],
+    "irrelevant": [
+      "Albus Dumbledore"
+    ],
+    "reason": "These two titles identify witches; Dumbledore's catalog description identifies a wizard."
+  },
+  {
+    "query": "wizard",
+    "relevant": [
+      "Albus Dumbledore"
+    ],
+    "reason": "The catalog description identifies the wizard even though his title does not."
+  },
+  {
+    "query": "owl round",
+    "relevant": [
+      "Animal Crossing Celeste"
+    ],
+    "irrelevant": [
+      "Animal Crossing Isabelle"
+    ],
+    "reason": "The existing catalog description describes Celeste as an owl with a rounded face; Isabelle is a dog."
+  },
+  {
+    "query": "puppy floppy ears",
+    "relevant": [
+      "Animal Crossing Isabelle"
+    ],
+    "irrelevant": [
+      "Animal Crossing Celeste"
+    ],
+    "reason": "Isabelle's catalog description says dog and floppy ears; puppy is a useful synonym for dog."
+  },
+  {
+    "query": "kitty lunar",
+    "relevant": [
+      "stargazer"
+    ],
+    "reason": "The catalog description shows a cat against a crescent moon, even though neither synonym appears in the title or metadata."
+  },
+  {
+    "query": "drgaon",
+    "relevant": [
+      "Dragon Flight"
+    ],
+    "reason": "A common adjacent-letter transposition should still find the matching title."
+  },
+  {
+    "query": "dumbledroe",
+    "relevant": [
+      "Albus Dumbledore"
+    ],
+    "reason": "A common adjacent-letter transposition should still find a named character."
+  },
+  {
+    "query": "dolphin stars",
+    "relevant": [],
+    "irrelevant": [
+      "Dolphin",
+      "Bald Eagle"
+    ],
+    "reason": "Multiple subject terms should all match: Dolphin has no stars and Bald Eagle has no dolphin."
+  },
+  {
+    "query": "jack o lantern face",
+    "relevant": [
+      "Ripper",
+      "Torment",
+      "Keaton"
+    ],
+    "reason": "Ripper, Torment and Keaton were reinspected by AI against their stencil previews and show jack-o-lantern faces."
+  },
+  {
+    "query": "wings",
+    "irrelevant": [
+      "Ripper"
+    ],
+    "reason": "An AI reinspection of the preview identified a face rather than wings."
+  },
+  {
+    "query": "ghost",
+    "irrelevant": [
+      "Torment"
+    ],
+    "reason": "An AI reinspection of the preview identified a jagged face rather than a ghost."
+  },
+  {
+    "query": "spider",
+    "relevant": [
+      "Spider",
+      "Spiteful Spider"
+    ],
+    "rankFirst": "Spider",
+    "reason": "The exact title should rank ahead of longer title matches."
+  }
+]

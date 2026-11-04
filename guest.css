@@ -215,3 +215,11 @@
 .preview-details{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 12px;margin:12px 0;font-size:13px}
 .preview-details dt{color:#b9cbbc;font-weight:700}
 .preview-details dd{margin:0;overflow-wrap:anywhere}
+.search-feedback{margin-top:15px;border-top:1px solid #587961;padding-top:10px}
+.search-feedback summary{cursor:pointer;color:#f3d3a9;font-weight:700;padding:8px 0}
+.search-feedback form{display:grid;gap:8px}
+.search-feedback label{font-size:13px;color:#d8e3d0}
+.search-feedback textarea{width:100%;box-sizing:border-box;resize:vertical;padding:10px;border:1px solid #77927a;border-radius:8px;background:#14291d;color:#fff;font:inherit;font-size:16px}
+.search-feedback button{justify-self:start;min-height:44px;border:1px solid #d3a26a;border-radius:8px;background:#38533c;color:#ffebc9;padding:8px 14px;font-weight:700}
+.search-feedback button:disabled{opacity:.55}
+.search-feedback #search-feedback-status{margin:0;color:#e9d1ae;font-size:12px}

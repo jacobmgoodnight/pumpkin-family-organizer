@@ -54,3 +54,16 @@ test('exact titles lead close matches and broad collection labels do not imply a
  assert.ok(score({name:'A Witchy Face',tags:[]},'witch')>0);
  assert.ok(score({name:'Cat and Moon',tags:[]},'kitty lunar')>0);
 });
+
+test('approved visual corrections replace inferred subject keywords on both pages',()=>{
+ const original={name:'Mysterious Figure',category:'Summer Spirits',tags:[],keywords:['ghost'],visual:{description:'A flying ghost',tags:['ghost']}};
+ const corrected={description:'A cat sitting down',tags:['cat']};
+ const organizer=query=>globalThis.PUMPKIN_SEARCH.score(original,query,corrected,{ignoreKeywords:true});
+ const guest=query=>score({...original,keywords:[],visual:corrected},query);
+ assert.ok(score(original,'ghost')>0);
+ for(const [query,expectedMatch] of [['ghost',false],['cat',true],['summer spirits',true]]){
+  assert.equal(organizer(query)>0,expectedMatch,'organizer: '+query);
+  assert.equal(guest(query)>0,expectedMatch,'guest: '+query);
+ }
+ assert.ok(globalThis.PUMPKIN_SEARCH.score(original,'ghost',original.visual)>0,'original keyword returns when correction is removed');
+});

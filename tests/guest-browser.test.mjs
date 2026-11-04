@@ -20,15 +20,18 @@ const originalFetch=window.fetch.bind(window);
 const catalog=[
  {id:'cat',name:'Cat Face',category:'Animals',difficulty:'Easy',source:'zombie',tags:[]},
  {id:'ghost',name:'Ghost Face',category:'Spooky',difficulty:'Hard',source:'additional',tags:[]},
- {id:'unrated',name:'Owl Face',category:'Animals',source:'extra',tags:[]}
+ {id:'unrated',name:'Owl Face',category:'Animals',source:'extra',tags:[]},
+ {id:'0123456789abcdef',name:'Mystery Shape',category:'Animals',source:'zombie',tags:[]}
 ];
 const household=JSON.parse(sessionStorage.getItem('__mockHousehold')||'null')||{personId:'me',name:'Charlotte',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Charlotte'}],familyChoices:[{personId:'me',templateId:'cat',favorite:true,finalPick:true}],imports:[{id:'preview-only',name:'Preview Only Pumpkin',category:'Family imports',thumbnail_path:'private/preview.png',original_path:null}],ideas:[]};
 window.__searchQueries=[];
 window.__choiceRequests=[];
+window.__feedbackRequests=[];
 window.confirm=()=>true;
 window.open=()=>{const popup={location:{href:''},close(){}};window.__popup=popup;return popup;};
 window.fetch=async (url,opts={})=>{
  if(String(url).includes('guest-catalog.json'))return new Response(JSON.stringify(catalog),{status:200});
+ if(String(url).includes('guest-search-metadata.json'))return new Response(JSON.stringify({'0123456789abcdef':{visual:{description:'A bird',tags:['bird']},keywords:['bird']}}),{status:200});
  if(String(url).includes('guest-pattern-details.json')){
   if(location.search.includes('delayDetails'))await new Promise(resolve=>window.__resolveDetails=resolve);
   if(location.search.includes('failDetails'))throw Error('Details unavailable');
@@ -39,6 +42,10 @@ window.fetch=async (url,opts={})=>{
   if(body.action==='guest'){
    data=structuredClone(household);
    if(window.__deferRefresh){window.__deferRefresh=false;if(window.__staleChange)data.people.push({id:'other',name:'Other'});await new Promise(resolve=>window.__resolveRefresh=resolve);}
+  }else if(body.action==='feedback'){
+   window.__feedbackRequests.push(body);
+   if(window.__failFeedback)return new Response(JSON.stringify({error:'Please try again'}),{status:503});
+   data={ok:true};
   }else if(body.action==='choice'){
    window.__choiceRequests.push(body);
    if(window.__deferChoice){window.__deferChoice=false;await new Promise(resolve=>window.__resolveChoice=resolve);}
@@ -141,6 +148,41 @@ const driver = `<script>
 })();
 </script>`;
 
+const feedbackDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
+ const $=id=>document.getElementById(id);
+ try{
+  await wait(()=>!$('guest-app').hidden&&$('grid').children.length);
+  const card=()=>[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Mystery Shape'));
+  card().querySelector('.image-open').click();
+  await wait(()=>$('search-feedback-current').textContent.includes('bird'));
+  $('search-feedback').open=true;$('search-feedback-note').value='This is a bat';
+  window.__failFeedback=true;$('search-feedback-form').requestSubmit();
+  await wait(()=>$('search-feedback-status').textContent.includes('try again'));
+  check('failed report keeps the note for retry',$('search-feedback-note').value==='This is a bat');
+  window.__failFeedback=false;$('search-feedback-form').requestSubmit();
+  await wait(()=>$('search-feedback-status').textContent.includes('Sent'));
+  check('report uses the invited user and chosen template',window.__feedbackRequests.at(-1).templateId==='0123456789abcdef'&&window.__feedbackRequests.at(-1).note==='This is a bat'&&window.__feedbackRequests.at(-1).token==='a'.repeat(43));
+  household.searchOverrides=[{templateId:'0123456789abcdef',description:'A bat',tags:['bat']}];
+  $('sync-status').click();await wait(()=>$('search-feedback-current').textContent.includes('bat'));
+  check('approved correction appears in preview',!$('search-feedback-current').textContent.includes('bird'));
+  $('preview-close').click();$('search').value='bat';$('search').dispatchEvent(new Event('input',{bubbles:true}));
+  check('approved correction changes search',!!card());
+  $('search').value='bird';$('search').dispatchEvent(new Event('input',{bubbles:true}));
+  check('approved correction removes erroneous inferred keywords',!card());
+  $('search').value='bat';$('search').dispatchEvent(new Event('input',{bubbles:true}));
+  household.searchOverrides=null;$('sync-status').click();await new Promise(r=>setTimeout(r,30));
+  check('failed optional override read preserves corrections',!!card());
+  household.searchOverrides=[];$('sync-status').click();await wait(()=>!card());
+  $('search').value='bird';$('search').dispatchEvent(new Event('input',{bubbles:true}));
+  check('deleting override restores published visual metadata',!!card());
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+
 function fixtureServer(driverScript='') {
  return createServer((req,res)=>{
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -178,6 +220,7 @@ async function runJourney(script, page='guest.html', query='') {
 
 test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(driver));
 test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
+test('family reports and approved corrections work in the private gallery', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(feedbackDriver));
 
 const detailsDriver = `<script>
 (async()=>{
@@ -230,6 +273,17 @@ const organizerDriver = `<script>
   check('more filters opens and exposes controls '+JSON.stringify({open:$('advanced-filters').open,aria:$('filter-toggle').getAttribute('aria-expanded'),height:$('category').getBoundingClientRect().height,hidden:$('catalog-area').hidden,dialogs:[...document.querySelectorAll('dialog[open]')].map(x=>x.id)}),$('advanced-filters').open && $('filter-toggle').getAttribute('aria-expanded')==='true' && $('category').getBoundingClientRect().height>0);
   $('filter-toggle').click();
   check('more filters closes',$('advanced-filters').open===false && $('filter-toggle').getAttribute('aria-expanded')==='false');
+  const familyItem={id:'family:correction-test',cloud_id:'correction-test',source:'family',name:'Mysterious Figure',category:'Summer Spirits',theme:'Summer Spirits',tags:[],keywords:['ghost'],visual:{description:'A ghost',tags:['ghost']},thumbnail:'app-icon.svg',path:''};
+  const bridge=window.PUMPKIN_FAMILY_BRIDGE;bridge.setCloudImports([familyItem]);$('source').value='';$('category').value='';
+  const matches=query=>{ $('search').value=query;return findVisible().some(item=>item.id===familyItem.id); };
+  check('original keyword is searchable',matches('ghost'));
+  bridge.setSearchOverrides([{templateId:familyItem.id,description:'A cat',tags:['cat']}]);
+  check('approved correction hides obsolete keyword',!matches('ghost'));
+  check('approved correction makes corrected tags searchable',matches('cat'));
+  check('collection name remains searchable',matches('summer spirits'));
+  bridge.setSearchOverrides([]);
+  check('removing correction restores original keyword',matches('ghost'));
+  $('search').value='';
   for(const id of ['search','sticky-search']){
    // Keep the compact field visible while testing its handler independently of scroll timing.
    if(id==='sticky-search')$('search').parentElement.append($('sticky-search'));

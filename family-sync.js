@@ -590,5 +590,6 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  });
  start();
  import('./family-features.js?v=20261104a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
+ import('./search-corrections.js?v=20261104a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Search corrections unavailable:',e));
  import('./search-suggestions.js?v=20261029c').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
 }
