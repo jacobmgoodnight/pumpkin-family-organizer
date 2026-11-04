@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261104b">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261104c">
 </head><body>
 <header><div class="container head">
  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Pick your pumpkin</h1></div>
@@ -32,6 +32,9 @@
    </div>
    <span id="read-only" class="read-only" hidden>Other people's choices are view-only</span>
   </div>
+  <div id="guest-search" class="guest-search">
+   <label class="search"><span>Search designs</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off" enterkeyhint="search" inputmode="search"></label>
+  </div>
   <nav id="guest-views" class="guest-views" aria-label="Your pumpkin views">
    <button id="quick-all" type="button" aria-pressed="true">All designs</button>
    <button id="quick-favorites" type="button" aria-pressed="false">♥ My favorites <span id="quick-favorites-count">0</span></button>
@@ -54,8 +57,11 @@
   </section>
 
   <div id="browse-toolbar" class="toolbar">
-   <label class="search"><span>Find a pumpkin</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off" enterkeyhint="search" inputmode="search"></label>
    <label class="filter"><span>Collection</span><select id="filter"><option value="all">Browse all</option><option value="favorite">♥ Favorites</option><option value="picked">✓ Final picks</option><option value="zombie">★ Curated designs</option><option value="family">Family imports</option><option value="web">Saved online ideas</option></select></label>
+   <div class="guest-tools">
+    <button id="surprise" type="button">🎲 Surprise me</button>
+    <button id="clear-guest-filters" type="button">Clear filters</button>
+   </div>
    <details id="guest-advanced" class="guest-advanced">
     <summary>More filters &amp; sorting</summary>
     <div class="advanced-grid">
@@ -64,10 +70,6 @@
      <label>Sort <select id="sort"><option value="curated">Most relevant / curated</option><option value="az">Name A–Z</option><option value="za">Name Z–A</option><option value="random">Surprise order</option></select></label>
     </div>
    </details>
-   <div class="guest-tools">
-    <button id="surprise" type="button">🎲 Surprise me</button>
-    <button id="clear-guest-filters" type="button">Clear filters</button>
-   </div>
   </div>
   <div class="summary"><span id="count"></span><span id="totals"></span><span id="sync-status" role="status" aria-live="polite">Synced</span></div>
   <button id="browse-online" class="browse-online" type="button" hidden>🌐 Find more for this search</button>
@@ -135,5 +137,5 @@
  <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
  <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261104b"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261104c"></script>
 </body></html>

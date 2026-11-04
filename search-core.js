@@ -11,6 +11,10 @@ const groups=[
 ];
 const aliases=new Map();for(const group of groups){const words=group.split(' ');for(const word of words)aliases.set(word,words);}
 const stopwords=new Set('show me find a an the of for with and or in on some design designs pattern patterns template templates stencil stencils please looking want need'.split(' '));
+// At the end of a longer search these usually describe the medium, not an
+// additional subject ("cat pumpkin stencil"). Keep standalone searches and
+// leading title words such as "Pumpkin King" meaningful.
+const trailingMediumWords=new Set(['pumpkin','pumpkins','carving','carvings']);
 let cache=new WeakMap();
 const normalize=value=>String(value||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 function distance(a,b){
@@ -26,6 +30,7 @@ function prepare(query){
  if(lastQuery?.input===query)return lastQuery;
  const raw=normalize(query);
  const filtered=raw.split(' ').filter(term=>term&&!stopwords.has(term));
+ while(filtered.length>1&&trailingMediumWords.has(filtered[filtered.length-1]))filtered.pop();
  const terms=(filtered.length?filtered:(raw?[raw]:[])).map(term=>({term,alternatives:aliases.get(term)||[term]}));
  return lastQuery={input:query,raw,terms};
 }
@@ -34,7 +39,14 @@ function index(item, visual, ignoreKeywords){
  let result=cache.get(item);if(result && result.visual===visual && result.ignoreKeywords===ignoreKeywords)return result;
  const indexedVisual=visual||{};
  const fields=[item.name,[...(indexedVisual.tags||[]),indexedVisual.description||''].join(' '),(ignoreKeywords?[]:(item.keywords||[])).join(' '),(item.tags||[]).join(' '),[item.category,item.theme].join(' '),item.difficulty];
- result={visual,ignoreKeywords,name:normalize(item.name),sets:fields.map(field=>new Set(normalize(field).split(' ').filter(Boolean)))};
+ const name=normalize(item.name),nameWords=name.split(' '),joinedNames=new Set();
+ // Handle joined character names such as Spider-Man / spiderman without
+ // fuzzy-matching unrelated words or combining visual metadata and tags.
+ for(let i=0;i<nameWords.length-1;i++){
+  const a=nameWords[i],b=nameWords[i+1];
+  if(a.length>=3&&b.length>=3&&a.length+b.length>=7)joinedNames.add(a+b);
+ }
+ result={visual,ignoreKeywords,name,joinedNames,sets:fields.map(field=>new Set(normalize(field).split(' ').filter(Boolean)))};
  cache.set(item,result);return result;
 }
 function score(item,query,visual=item.visual,{ignoreKeywords=false}={}){
@@ -42,6 +54,7 @@ function score(item,query,visual=item.visual,{ignoreKeywords=false}={}){
  const {raw,terms}=prepare(query);if(!raw)return 0;
  const ix=index(item,visual,ignoreKeywords);let total=0;
  for(const {term,alternatives} of terms){let best=0;
+  if(ix.joinedNames.has(term))best=weights[0];
   // Series and category names are broad labels, so expand synonyms only in
   // the title, reviewed visual details, and subject keywords.
   for(let i=0;i<ix.sets.length;i++)for(const alternative of i<3?alternatives:[term])for(const word of ix.sets[i]){

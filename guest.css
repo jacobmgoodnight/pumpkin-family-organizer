@@ -223,3 +223,11 @@
 .search-feedback button{justify-self:start;min-height:44px;border:1px solid #d3a26a;border-radius:8px;background:#38533c;color:#ffebc9;padding:8px 14px;font-weight:700}
 .search-feedback button:disabled{opacity:.55}
 .search-feedback #search-feedback-status{margin:0;color:#e9d1ae;font-size:12px}
+
+/* Put discovery first while keeping personal and family views within reach. */
+.guest-search{margin:12px 0 8px}
+.guest-search .search{position:relative;display:grid;gap:5px;overflow:visible;font-size:14px;font-weight:700;color:#f3d1a5}
+.guest-views{display:flex}
+.guest-views button{flex:1 1 0}
+#browse-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}
+@media(max-width:600px){.guest-search{margin:10px 0 7px}#browse-toolbar{grid-template-columns:1fr}}

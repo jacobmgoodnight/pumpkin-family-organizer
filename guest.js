@@ -1,4 +1,4 @@
-import {guestSearchScore} from "./guest-search.js?v=20261104b";
+import {guestSearchScore} from "./guest-search.js?v=20261104c";
 import {mountSmartSuggestions} from "./search-suggestions.js?v=20261103b";
 import {createInviteAccess} from "./guest-access.js?v=20261103b";
 // Invite-only family gallery. The token is a single-person bearer capability,
@@ -191,6 +191,9 @@ function updateQuickViews(){
  const selected=$("filter").value,own=selectedIsMe(),counts=selectionCount(me?.personId);
  $("quick-favorites-count").textContent=String(counts.favorites);
  $("quick-picks-count").textContent=String(counts.picks);
+ // Keep the active view reachable when its last saved item is removed. The
+ // shortcut also appears during search so someone can open their shortlist.
+ $("quick-favorites").hidden=!(counts.favorites>0||$("search").value.trim()||(own&&selected==="favorite"));
  for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
    const pressed=selected===kind&&(kind==="all"||own);
    $(id).setAttribute("aria-pressed",String(pressed));
@@ -200,9 +203,10 @@ function updateQuickViews(){
  $("totals").hidden=own;
  $("view-heading").textContent=!own?who+"'s saved pumpkins"
    :selected==="favorite"?"My favorites"
-   :selected==="picked"?"My final picks":"Find your pumpkin";
+   :selected==="picked"?"My final picks":"All designs";
  $("guest-views").hidden=!own;
  $("other-person-banner").hidden=own;
+ $("guest-search").hidden=!own;
  $("browse-toolbar").hidden=!own;
  $("online-panel").hidden=!own;
  const term=$("search").value.trim();
