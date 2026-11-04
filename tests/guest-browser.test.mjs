@@ -171,7 +171,7 @@ const organizerDriver = `<script>
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out waiting for organizer');};
  const $=id=>document.getElementById(id);
  try{
-  await wait(()=>$('filter-toggle').textContent.includes('active'));
+  await wait(()=>$('advanced-filters').title);
   // The fixture has no family session; show the organizer controls without using production credentials.
   document.body.classList.remove('cloud-gated');
   $('filter-toggle').click();
@@ -179,7 +179,8 @@ const organizerDriver = `<script>
   $('filter-toggle').click();
   check('more filters closes',$('advanced-filters').open===false && $('filter-toggle').getAttribute('aria-expanded')==='false');
   for(const id of ['search','sticky-search']){
-   if(id==='sticky-search')$('sticky-quick-search').hidden=false;
+   // Keep the compact field visible while testing its handler independently of scroll timing.
+   if(id==='sticky-search')$('search').parentElement.append($('sticky-search'));
    const input=$(id);input.focus({preventScroll:true});
    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true}));
    await new Promise(r=>setTimeout(r,10));
