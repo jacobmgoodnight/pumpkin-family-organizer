@@ -1,4 +1,4 @@
-import {guestSearchScore} from "./guest-search.js?v=20261103b";
+import {guestSearchScore} from "./guest-search.js?v=20261104b";
 import {mountSmartSuggestions} from "./search-suggestions.js?v=20261103b";
 import {createInviteAccess} from "./guest-access.js?v=20261103b";
 // Invite-only family gallery. The token is a single-person bearer capability,
@@ -18,6 +18,8 @@ let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=n
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
 let savedIdeas=[],familyImports=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0,choiceGeneration=0;
+let searchMetadata={},searchOverrides=new Map();
+const builtinTemplate=id=>/^(?:[a-f0-9]{16}|extra:[a-z0-9-]{1,100})$/.test(id);
 // Keep confirmed imports visible until a household snapshot contains them. A
 // refresh may already be in flight when the import completes.
 const pendingImports=new Map();
@@ -325,7 +327,9 @@ function attachDialogClose(dialog,buttonId){
  dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
 }
 let openedItem=null;
-function openPreview(item){openedItem=item;
+function openPreview(item){
+ if(openedItem?.id!==item.id){$("search-feedback").open=false;$("search-feedback-note").value="";$("search-feedback-status").textContent="";}
+ openedItem=item;
  if($("compare-dialog").open)$("compare-dialog").close();
  if(!$("preview-dialog").open)$("preview-dialog").showModal();
  refreshModal();void images();
@@ -358,6 +362,10 @@ function refreshModal(){
  image.src=item.source==="web"?(safeUrl(item.thumbnail)||"app-icon.svg"):(cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg");
  if(item.thumbnail&&item.source!=="web"&&(!cached||cached.expires<=Date.now()))void images();
  renderPreviewDetails(item);
+ const report=$("search-feedback");report.hidden=!builtinTemplate(item.id);
+ const visual=item.visual||{};
+ $("search-feedback-current").textContent=(visual.description?"Description: "+visual.description+". ":"")+
+   (Array.isArray(visual.tags)&&visual.tags.length?"Search tags: "+visual.tags.join(", ")+".":"") || "No visual description is available yet.";
  $("preview-description").textContent=item.source==="web"
    ?"Saved online idea · Source link only. No printable file has been imported. Ask the organizer to import a permitted image."
    :item.source==="family"
@@ -462,11 +470,15 @@ function familyFingerprint(data){
  const choices=[...(data.familyChoices||data.choices||[])].sort((a,b)=>String(a.personId||a.person_id).localeCompare(String(b.personId||b.person_id))||String(a.templateId||a.template_id).localeCompare(String(b.templateId||b.template_id)));
  const imports=[...(data.imports||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
  const ideas=[...(data.ideas||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
- return JSON.stringify([choices,imports,ideas,data.people||[]]);
+ return JSON.stringify([choices,imports,ideas,data.people||[],data.searchOverrides]);
 }
 function loadFamilySnapshot(data){
  lastFamilyFingerprint=familyFingerprint(data);
  setFamilyData(data);prepareImports(data.imports);prepareIdeas(data.ideas);
+ if(Array.isArray(data.searchOverrides)){
+   searchOverrides=new Map(data.searchOverrides.filter(x=>builtinTemplate(x?.templateId)&&typeof x.description==="string"&&x.description.length<=500&&Array.isArray(x.tags)&&x.tags.length<=20&&x.tags.every(tag=>typeof tag==="string"&&tag.length<=40)).map(x=>[x.templateId,{description:x.description,tags:x.tags}]));
+ }
+ applySearchCorrections();
  updateDiscoveryFilters();filter();renderLineup();
 }
 async function refreshFamily(manual=false){
@@ -564,6 +576,8 @@ function makeImportButton(row){
  return action;
 }
 function openOnlinePreview(row){
+ openedItem=null;
+ $("search-feedback").hidden=true;
  openedItem=null;
  const dialog=$("preview-dialog");
  if($("compare-dialog").open)$("compare-dialog").close();
@@ -757,6 +771,18 @@ $("forget").addEventListener("click",()=>{
 $("retry-access").addEventListener("click",()=>void start());
 attachDialogClose($("preview-dialog"),"preview-close");
 attachDialogClose($("compare-dialog"),"compare-close");
+$("search-feedback-form").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const item=openedItem,note=$("search-feedback-note").value.trim();
+ if(!item||!builtinTemplate(item.id)||!note)return;
+ const submit=$("search-feedback-submit"),status=$("search-feedback-status");
+ submit.disabled=true;status.textContent="Sending suggestion…";
+ try{
+   await api({action:"feedback",templateId:item.id,note});
+   if(openedItem?.id===item.id){status.textContent="Sent to the organizer for review. Thank you!";$("search-feedback-note").value="";}
+ }catch(error){if(openedItem?.id===item.id)status.textContent=error.message||"Could not send your suggestion. Please try again.";}
+ finally{submit.disabled=false;}
+});
 // Browsers can navigate to another invitation on this same page without a
 // document load. Hide the old person's gallery and reinitialize with the new
 // fragment. replaceState in createInviteAccess removes the fragment without
@@ -778,7 +804,7 @@ async function loadSearchMetadata(){
  const controller=new AbortController();
  const timeout=setTimeout(()=>controller.abort(),12000);
  try{
-   const response=await fetch("guest-search-metadata.json?v=20261103b",{cache:"force-cache",signal:controller.signal});
+   const response=await fetch("guest-search-metadata.json?v=20261104b",{cache:"force-cache",signal:controller.signal});
    return response.ok?await response.json():{};
  }catch{return {};}
  finally{clearTimeout(timeout);}
@@ -809,15 +835,23 @@ function applyPatternDetails(metadata){
 }
 function applySearchMetadata(metadata){
  if(!me||!metadata||typeof metadata!=="object"||!Object.keys(metadata).length)return;
- // Refresh the current catalog, including imports and ideas that may have
- // arrived since the request started. Replacing enriched rows also invalidates
- // the search index, which is keyed by object identity.
- catalog=catalog.map(item=>metadata[item.id]?{...item,...metadata[item.id]}:item);
- library=new Map(catalog.map(item=>[item.id,item]));
- guestSuggestions.refresh();
+ searchMetadata=metadata;
+ applySearchCorrections();
  const previousVisible=visible;
  filter();
  if(previousVisible>visible){visible=previousVisible;render();}
+}
+function applySearchCorrections(){
+ // Replace objects to invalidate the search index and restore published visual
+ // metadata if a previously approved household correction is deleted.
+ catalog=catalog.map(item=>{
+   if(!builtinTemplate(item.id))return item;
+   const base=searchMetadata[item.id]||{},override=searchOverrides.get(item.id);
+   return {...item,...base,keywords:override?[]:(base.keywords||[]),visual:override||base.visual};
+ });
+ library=new Map(catalog.map(item=>[item.id,item]));
+ guestSuggestions.refresh();
+ if(openedItem&&$("preview-dialog").open){openedItem=library.get(openedItem.id)||openedItem;refreshModal();}
 }
 async function start(){
  if(!token){showAccessHelp("Open your personal link from Messages. If it expired or you're using a new phone, ask the organizer to resend or regenerate your invitation.");return;}

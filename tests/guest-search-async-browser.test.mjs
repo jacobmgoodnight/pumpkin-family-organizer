@@ -12,12 +12,12 @@ const browser=findBrowser();
 const fixture=`<script>
 window.PUMPKIN_CLOUD_CONFIG={url:location.origin,publishableKey:'test'};
 const realFetch=window.fetch.bind(window);
-const rows=[{id:'one',name:'Hidden Grin',category:'Other',source:'zombie',tags:[]},{id:'two',name:'Moon Mask',category:'Other',source:'zombie',tags:[]}];
+const rows=[{id:'1111111111111111',name:'Hidden Grin',category:'Other',source:'zombie',tags:[]},{id:'2222222222222222',name:'Moon Mask',category:'Other',source:'zombie',tags:[]}];
 window.__household={personId:'me',name:'Taylor',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Taylor'}],familyChoices:[],imports:[{id:'imp',name:'Family Pumpkin',category:'Family imports',tags:[]}],ideas:[{id:'idea',title:'Online Pumpkin',source_url:'https://example.com/design'}]};
 window.fetch=async(url,options={})=>{
  const target=String(url);
  if(target.includes('guest-catalog.json'))return new Response(JSON.stringify(rows));
- if(target.includes('guest-search-metadata.json'))return await new Promise(resolve=>window.releaseMetadata=()=>resolve(new Response(JSON.stringify({one:{visual:{description:'A floating apparition',tags:['apparition']}},two:{visual:{description:'A smiling apparition',tags:['apparition']}}}))));
+ if(target.includes('guest-search-metadata.json'))return await new Promise(resolve=>window.releaseMetadata=()=>resolve(new Response(JSON.stringify({'1111111111111111':{visual:{description:'A floating apparition',tags:['apparition']}},'2222222222222222':{visual:{description:'A smiling apparition',tags:['apparition']}}}))));
  if(target.includes('/functions/v1/pumpkin-profile-invites'))return new Response(JSON.stringify(window.__household));
  return realFetch(url,options);
 };

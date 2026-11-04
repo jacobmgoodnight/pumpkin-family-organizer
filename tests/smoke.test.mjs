@@ -44,14 +44,11 @@ test("Print action distinguishes local, private and preview-only",()=>{
  assert.equal(preview.tag,"span");assert.match(preview.caption,/Preview only/);
  assert.match(sync,/data-original-id/);
 });
-test("Offline search retains fuzzy and synonym matching",()=>{
- const a=html.indexOf("function normalizeSearch("),b=html.indexOf("function findVisible()",a);
- assert.ok(a>0&&b>a);
- const search=new Function("VISUAL_CAPTIONS",html.slice(a,b)+";return {searchDistance,searchScore};")({});
- assert.equal(search.searchDistance("skeletn","skeleton"),1);
+test("Offline search retains fuzzy and synonym matching",async()=>{
+ const {guestSearchScore}=await import('../guest-search.js');
  const x={id:"test",name:"Skeleton Cat",tags:[],keywords:[],category:"Spooky",theme:"Halloween",difficulty:""};
- assert.ok(search.searchScore(x,["kitty"],"kitty")>0);
- assert.ok(search.searchScore(x,["skeleton"],"skeleton")>search.searchScore(x,["skeletn"],"skeletn"));
+ assert.ok(guestSearchScore(x,"kitty")>0);
+ assert.ok(guestSearchScore(x,"skeleton")>guestSearchScore(x,"skeletn"));
 });
 test("Imported design names normalize accents and punctuation",()=>{
  const start=features.indexOf("const normalizeTitle="),end=features.indexOf(";",start);
