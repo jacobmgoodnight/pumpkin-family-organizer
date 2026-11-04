@@ -46,7 +46,7 @@ test("Missing online query focuses search instead of billing or opening empty re
 
 test("Guest Enter dismisses mobile keyboard, hides suggestions, updates results",()=>{
  assert.match(guest,/\$\("search"\)\.addEventListener\("keydown",event=>\{/);
- assert.match(guest,/if\(event\.key==="Enter"\)/);
+ assert.match(guest,/if\(event\.key==="Enter"&&!event\.isComposing/);
  assert.match(guest,/guestSuggestions\.hide\(\)/);
  assert.match(guest,/dismissSearchKeyboard\(\$\("search"\)\)/);
  assert.match(guest,/dismissSearchKeyboard\(\$\("online-search"\)\)/);
