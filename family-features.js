@@ -1,3 +1,4 @@
+import {openFamilyOriginal} from './family-original.js?v=20261104a';
 // Goodnight family library, image discovery and private file imports.
 export function init({getClient,getOwner,bridge}){
  const $=id=>document.getElementById(id),client=()=>getClient(),owner=()=>getOwner();
@@ -412,15 +413,19 @@ actions.append(importBtn,webBtn,libraryTools);
    }
    return cache;
  }
+ window.PUMPKIN_OPEN_FAMILY_ORIGINAL=id=>openFamilyOriginal({
+   getOwner:owner,getClient:client,getRow:id=>userId===owner()?cloudRows.find(row=>row.id===id):null,
+   openWindow:()=>window.open('about:blank','_blank'),notify:message=>alert(message)
+ },id);
  async function refreshImports(){
    if(loading){refreshQueued=true;return;}if(!owner())return;loading=true;const uid=owner();
    try{const {data,error}=await client().from("pc_imports").select("*").eq("user_id",uid).order("created_at",{ascending:false}).limit(2000);
      if(error)throw error;if(uid!==owner())return;cloudRows=data||[];
-     const links=await signed(cloudRows.flatMap(r=>[r.thumbnail_path,r.original_path]));if(uid!==owner())return;
+     const links=await signed(cloudRows.map(r=>r.thumbnail_path));if(uid!==owner())return;
      bridge.setCloudImports(cloudRows.map(r=>({
        id:"family:"+r.id,name:r.name,category:r.category||"Family imports",theme:r.category||"Family imports",
        tags:r.tags||[],keywords:r.tags||[],difficulty:r.difficulty||"",thumbnail:links.get(r.thumbnail_path)||placeholder,
-       path:links.get(r.original_path)||"",source:"family",pages:1,cloud_id:r.id
+       path:"",hasOriginal:!!r.original_path,source:"family",pages:1,cloud_id:r.id
      })));
      importBtn.textContent="＋ Import";manageBtn.textContent="Manage imports"+(cloudRows.length?" ("+cloudRows.length+")":"");
    }catch(err){console.error("Could not load family imports",err);manageBtn.title="Could not refresh imports: "+err.message;}finally{loading=false;if(refreshQueued){refreshQueued=false;void refreshImports()}}
@@ -438,6 +443,8 @@ actions.append(importBtn,webBtn,libraryTools);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&owner()&&Date.now()>cacheUntil-5*60*1000)refreshImports()});
  window.addEventListener("pumpkin:cloudready",connect);
  setInterval(()=>{if(owner())refreshImports()},25*60*1000);
- window.addEventListener("pumpkin:cloudsignedout",()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;recentSearches.clear();++currentWebRequest;activeTerm="";cache.clear();cacheUntil=0;cloudRows=[];bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";});
+ const clearAccountData=()=>{if(channel)client()?.removeChannel(channel);channel=null;userId=null;recentSearches.clear();++currentWebRequest;activeTerm="";cache.clear();cacheUntil=0;cloudRows=[];bridge.setCloudImports([]);ideas=[];ideasBtn.textContent="♡ Saved web ideas";};
+ window.addEventListener("pumpkin:cloudsignedout",clearAccountData);
+ window.addEventListener("pumpkin:cloudownerchange",clearAccountData);
  if(owner())connect();
 }

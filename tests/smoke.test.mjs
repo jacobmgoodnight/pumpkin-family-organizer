@@ -319,10 +319,11 @@ test("Google discovery is a one-step inline search with collapsible results",()=
  assert.match(page,/guest\.js\?v=[A-Za-z0-9_-]+/);
 });
 
-test("Web ideas are explicitly preview-only, family imports are printable",()=>{
+test("Web ideas and family imports distinguish previews from originals",()=>{
  const guest=file("guest.js"),css=file("guest.css");
  assert.match(guest,/Inspiration link · no printable file yet/);
  assert.match(guest,/Saved online idea · Source link only/);
- assert.match(guest,/Family import · Private image\/PDF/);
+ assert.match(guest,/Family import · Open the original for printing/);
+ assert.match(guest,/Family import · Preview only/);
  assert.match(css,/\.idea-only-marker/);
 });

@@ -358,7 +358,8 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
        if(!session?.user){owner=null;outbox=[];last=null;urls.clear();urlsUntil=0;ui(false);status('Sign in to share favorites');window.dispatchEvent(new Event('pumpkin:cloudsignedout'));return;}
        if(owner===session.user.id)return;
        urls.clear();urlsUntil=0;
-       owner=session.user.id;
+       const previousOwner=owner;owner=session.user.id;
+       if(previousOwner&&previousOwner!==owner){ui(false);window.dispatchEvent(new Event('pumpkin:cloudownerchange'));}
        $('organizer-identity').textContent=session.user.email||'Parent account';
        last=clone(bridge.snapshot());outbox=loadOutbox(owner);status(outbox.length?'Restoring pending family changes…':'Loading family choices…');
        try{
@@ -588,6 +589,6 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(!failed)uploadDetails.open=false;
  });
  start();
- import('./family-features.js?v=20261029c').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
+ import('./family-features.js?v=20261104a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
  import('./search-suggestions.js?v=20261029c').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
 }

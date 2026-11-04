@@ -99,7 +99,8 @@ function prepareImports(rows){
  catalog=catalog.filter(x=>x.source!=="family");
  for(const x of merged.values()){
    catalog.push({id:"family:"+x.id,name:x.name||"Family import",category:x.category||"Family imports",
-     source:"family",difficulty:x.difficulty||"",tags:x.tags||[],thumbnail:x.thumbnail_path||x.original_path||"",importId:x.id});
+     source:"family",difficulty:x.difficulty||"",tags:x.tags||[],thumbnail:x.thumbnail_path||x.original_path||"",
+     importId:x.id,hasOriginal:typeof x.original_path==="string"&&!!x.original_path.trim()});
  }
  library=new Map(catalog.map(x=>[x.id,x]));
 }
@@ -135,7 +136,7 @@ function updateDiscoveryFilters(){
    select.value=values.includes(selected)?selected:"all";
  };
  fill(theme,[...new Set(catalog.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All themes",oldTheme);
- fill(difficulty,[...new Set(catalog.map(x=>x.difficulty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All difficulties",oldDifficulty);
+ fill(difficulty,[...new Set(catalog.map(x=>x.difficulty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),"All difficulties and levels",oldDifficulty);
 }
 const guestNameCollator=new Intl.Collator(undefined,{numeric:true});
 function guestSort(items,mode,q,scores){
@@ -297,11 +298,15 @@ function render(){
      const marker=document.createElement("small");marker.className="idea-only-marker";
      marker.textContent="💡 Inspiration link · no printable file yet";area.append(marker);
    }
+   if(item.source==="family"&&!item.hasOriginal){
+     const marker=document.createElement("small");marker.className="idea-only-marker";
+     marker.textContent="Preview only · ask the organizer to add the original";area.append(marker);
+   }
    area.append(itemActions(item));
    const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
    area.append(compare);
-   if(item.importId)area.append(button("📄 Open / print image",()=>printable(item),"print"));
+   if(item.importId&&item.hasOriginal)area.append(button("📄 Open / print image",()=>printable(item),"print"));
    if(item.source==="web"&&item.sourceUrl)area.append(sourceLink(item.sourceUrl,"Open source ↗"));
    card.append(area);host.append(card);
  }
@@ -325,6 +330,23 @@ function openPreview(item){openedItem=item;
  if(!$("preview-dialog").open)$("preview-dialog").showModal();
  refreshModal();void images();
 }
+function renderPreviewDetails(item){
+ const details=$("preview-details");details.replaceChildren();
+ const source=item.source==="web"?(item.sourceName||"Website")
+   :item.source==="family"?"Family import"
+   :item.source==="zombie"?"Zombie Pumpkins":"Additional collection";
+ const difficulty=!item.difficulty?["Difficulty","Not rated"]
+   :item.source==="extra"?["Collection level",item.difficulty+" · source folder"]
+   :item.source==="family"?["Family-entered difficulty",item.difficulty]
+   :item.source==="zombie"?["Catalog difficulty",item.difficulty+" · source not verified"]
+   :["Difficulty",item.difficulty];
+ const rows=[["Source",source],[item.theme?"Theme":"Category",item.theme||item.category||"Not specified"],
+   difficulty,["Technique",item.technique||"Not specified"]];
+ for(const [label,value] of rows){
+   const term=document.createElement("dt"),description=document.createElement("dd");
+   term.textContent=label;description.textContent=value;details.append(term,description);
+ }
+}
 function refreshModal(){
  if(!openedItem||!$("preview-dialog").open)return;
  const item=openedItem;$("preview-title").textContent=item.name;
@@ -335,17 +357,19 @@ function refreshModal(){
  image.referrerPolicy="no-referrer";
  image.src=item.source==="web"?(safeUrl(item.thumbnail)||"app-icon.svg"):(cached?.expires>Date.now()&&cached.url?cached.url:"app-icon.svg");
  if(item.thumbnail&&item.source!=="web"&&(!cached||cached.expires<=Date.now()))void images();
+ renderPreviewDetails(item);
  $("preview-description").textContent=item.source==="web"
    ?"Saved online idea · Source link only. No printable file has been imported. Ask the organizer to import a permitted image."
    :item.source==="family"
-     ?"Family import · Private image/PDF is available to open for printing. Check the original's quality."
-     :[item.category,item.difficulty,"Built-in design · Licensed original remains on organizer's computer"].filter(Boolean).join(" · ");
+     ?item.hasOriginal?"Family import · Open the original for printing and check its quality."
+       :"Family import · Preview only. Ask the organizer to add the original for printing."
+     :"Ask the organizer to locate the original file for a sharp print.";
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
- if(item.importId)actions.append(button("📄 Open / print image",()=>printable(item)));
+ if(item.importId&&item.hasOriginal)actions.append(button("📄 Open / print image",()=>printable(item)));
  if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
- else if(item.source!=="family"){const span=document.createElement("span");span.className="note";span.textContent="Original PDFs remain on the organizer's computer.";actions.append(span);}
+ else if(item.source!=="family"){const span=document.createElement("span");span.className="note";span.textContent="Ask the organizer to open the original file for printing.";actions.append(span);}
 }
 function showCompare(){
  const host=$("compare-grid");host.replaceChildren();
@@ -363,7 +387,7 @@ function showCompare(){
  void images();
 }
 async function printable(item){
- if(!item.importId)return;
+ if(!item.importId||!item.hasOriginal)return;
  const popup=window.open("","_blank");
  try{
    const {url}=await api({action:"print",importId:item.importId});
@@ -544,6 +568,7 @@ function openOnlinePreview(row){
  const dialog=$("preview-dialog");
  if($("compare-dialog").open)$("compare-dialog").close();
  $("preview-title").textContent=row.title||"Pumpkin design idea";
+ renderPreviewDetails({source:"web",sourceName:row.source||"Website",category:"Online idea"});
  const image=$("preview-image");
  image.removeAttribute("data-preview");image.referrerPolicy="no-referrer";
  image.alt=row.title||"Online pumpkin design";image.src=safeUrl(row.originalImageUrl)||safeUrl(row.thumbnail)||"app-icon.svg";
@@ -758,6 +783,30 @@ async function loadSearchMetadata(){
  }catch{return {};}
  finally{clearTimeout(timeout);}
 }
+async function loadPatternDetails(){
+ // Ratings enrich the gallery but never block access to a private invitation.
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),12000);
+ try{
+   const response=await fetch("guest-pattern-details.json?v=20261104a",{cache:"force-cache",signal:controller.signal});
+   return response.ok?await response.json():{};
+ }catch{return {};}
+ finally{clearTimeout(timeout);}
+}
+function applyPatternDetails(metadata){
+ if(!me||!metadata||typeof metadata!=="object"||!Object.keys(metadata).length)return;
+ catalog=catalog.map(item=>{
+   const difficulty=metadata[item.id]?.difficulty,theme=metadata[item.id]?.theme;
+   return {...item,...(typeof difficulty==="string"&&difficulty.trim()?{difficulty}:{}),
+     ...(typeof theme==="string"&&theme.trim()?{theme}:{})};
+ });
+ library=new Map(catalog.map(item=>[item.id,item]));
+ updateDiscoveryFilters();
+ const previousVisible=visible;
+ filter();
+ if(previousVisible>visible){visible=previousVisible;render();}
+ if(openedItem){openedItem=library.get(openedItem.id)||openedItem;refreshModal();}
+}
 function applySearchMetadata(metadata){
  if(!me||!metadata||typeof metadata!=="object"||!Object.keys(metadata).length)return;
  // Refresh the current catalog, including imports and ideas that may have
@@ -776,6 +825,7 @@ async function start(){
  try{
    notice("Opening your private family gallery…");
    const metadataPromise=loadSearchMetadata();
+   const detailsPromise=loadPatternDetails();
    const [items,data]=await Promise.all([
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
@@ -783,6 +833,7 @@ async function start(){
    access.confirm();
    catalog=items;loadFamilySnapshot(data);notice("");
    void metadataPromise.then(applySearchMetadata);
+   void detailsPromise.then(applyPatternDetails);
  }catch(error){
    if(error.status===401){
      access.invalidate();

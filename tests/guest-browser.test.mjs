@@ -19,15 +19,21 @@ window.PUMPKIN_CLOUD_CONFIG={url:location.origin,publishableKey:'test'};
 const originalFetch=window.fetch.bind(window);
 const catalog=[
  {id:'cat',name:'Cat Face',category:'Animals',difficulty:'Easy',source:'zombie',tags:[]},
- {id:'ghost',name:'Ghost Face',category:'Spooky',difficulty:'Hard',source:'additional',tags:[]}
+ {id:'ghost',name:'Ghost Face',category:'Spooky',difficulty:'Hard',source:'additional',tags:[]},
+ {id:'unrated',name:'Owl Face',category:'Animals',source:'extra',tags:[]}
 ];
-const household=JSON.parse(sessionStorage.getItem('__mockHousehold')||'null')||{personId:'me',name:'Charlotte',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Charlotte'}],familyChoices:[{personId:'me',templateId:'cat',favorite:true,finalPick:true}],imports:[],ideas:[]};
+const household=JSON.parse(sessionStorage.getItem('__mockHousehold')||'null')||{personId:'me',name:'Charlotte',expiresAt:'2099-01-01T00:00:00Z',people:[{id:'me',name:'Charlotte'}],familyChoices:[{personId:'me',templateId:'cat',favorite:true,finalPick:true}],imports:[{id:'preview-only',name:'Preview Only Pumpkin',category:'Family imports',thumbnail_path:'private/preview.png',original_path:null}],ideas:[]};
 window.__searchQueries=[];
 window.__choiceRequests=[];
 window.confirm=()=>true;
 window.open=()=>{const popup={location:{href:''},close(){}};window.__popup=popup;return popup;};
 window.fetch=async (url,opts={})=>{
  if(String(url).includes('guest-catalog.json'))return new Response(JSON.stringify(catalog),{status:200});
+ if(String(url).includes('guest-pattern-details.json')){
+  if(location.search.includes('delayDetails'))await new Promise(resolve=>window.__resolveDetails=resolve);
+  if(location.search.includes('failDetails'))throw Error('Details unavailable');
+  return new Response(JSON.stringify({unrated:{difficulty:'Level 3',theme:'Wildlife'}}),{status:200});
+ }
  if(String(url).includes('/functions/v1/pumpkin-profile-invites')){
   const body=JSON.parse(opts.body);let data;
   if(body.action==='guest'){
@@ -41,7 +47,7 @@ window.fetch=async (url,opts={})=>{
    sessionStorage.setItem('__mockHousehold',JSON.stringify(household));
    data={favorite:body.favorite,finalPick:body.finalPick};
   }else if(body.action==='import'){
-   const imported={id:'import-1',name:'Owl Lantern',category:'Family imports',tags:[],thumbnail_path:'private/owl.png',original_path:'private/owl.png'};
+   const imported={id:'import-1',name:'Owl Lantern',category:'Family imports',difficulty:'Medium',tags:[],thumbnail_path:'private/owl.png',original_path:'private/owl.png'};
    household.imports.push(imported);sessionStorage.setItem('__mockHousehold',JSON.stringify(household));data={imported};
   }else if(body.action==='print'){window.__printed=body.importId;data={url:'https://example.com/signed-print'};}
   else data=body.action==='search'?(window.__searchQueries.push(body.query),{results:[{title:'Owl Lantern',source:'Example',sourceUrl:'https://example.com/owl',thumbnail:'https://example.com/owl.png',importTicket:'ticket'}]}):{links:{}};
@@ -64,6 +70,11 @@ const importDriver = `<script>
   check('participant more filters opens', $('guest-advanced').open && getComputedStyle($('theme')).display!=='none');
   $('guest-advanced').querySelector('summary').click();
   check('participant more filters closes', !$('guest-advanced').open);
+  const previewOnly=[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Preview Only Pumpkin'));
+  check('preview-only import has no print action',!!previewOnly&&!previewOnly.textContent.includes('Open / print')&&previewOnly.textContent.includes('Preview only'));
+  previewOnly.querySelector('.image-open').click();
+  check('preview-only detail explains missing original',$('preview-description').textContent.includes('Preview only')&&$('preview-description').textContent.includes('organizer')&&!$('preview-actions').textContent.includes('Open / print'));
+  $('preview-close').click();
   if(!sessionStorage.getItem('__importStage')){
    $('online-search').value='owl';$('online-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
    await wait(()=>$('online-results').querySelector('.web-import'));
@@ -71,6 +82,9 @@ const importDriver = `<script>
    $('online-results').querySelector('.web-import').click();
    await wait(()=>card() && $('online-results').textContent.includes('In family library'));
    check('confirmed import appears while a refresh is in flight',!!card());
+   card().querySelector('.image-open').click();
+   check('family difficulty is attributed to family entry',$('preview-details').textContent.includes('Family-entered difficulty')&&$('preview-details').textContent.includes('Medium'));
+   $('preview-close').click();
    window.__resolveRefresh();await new Promise(r=>setTimeout(r,30));
    check('stale refresh keeps the imported design visible',!!card());
    action('Save').click();await wait(()=>action('Saved')&&!action('Saved').disabled);
@@ -141,12 +155,12 @@ function fixtureServer(driverScript='') {
  });
 }
 
-async function runJourney(script, page='guest.html') {
+async function runJourney(script, page='guest.html', query='') {
  const server = fixtureServer(script);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-browser-'));
  try {
-  const url=`http://127.0.0.1:${server.address().port}/${page}#invite=${'a'.repeat(43)}`;
+  const url=`http://127.0.0.1:${server.address().port}/${page}${query}#invite=${'a'.repeat(43)}`;
   const args=['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=6000',`--user-data-dir=${profile}`,'--dump-dom',url];
   const result=await new Promise((resolve,reject)=>{
    const child=spawn(browser,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});let stdout='',stderr='';
@@ -164,6 +178,44 @@ async function runJourney(script, page='guest.html') {
 
 test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(driver));
 test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
+
+const detailsDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out waiting for page');};
+ const $=id=>document.getElementById(id);
+ try{
+  await wait(()=>!$('guest-app').hidden && $('grid').children.length);
+  const card=[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Owl Face'));
+  card.querySelector('.image-open').click();
+  const details=()=>$('preview-details').textContent;
+  check('unknown ratings and techniques are labeled',details().includes('Not rated')&&details().includes('Not specified'));
+  check('source and theme are visible',details().includes('Additional collection')&&details().includes('Animals'));
+  if(location.search.includes('delayDetails')){
+   await wait(()=>window.__resolveDetails);window.__resolveDetails();
+   await wait(()=>details().includes('Level 3'));
+   check('late rating updates an open preview',details().includes('Level 3'));
+   check('collection level is attributed to the folder',details().includes('Collection level')&&details().includes('source folder'));
+   check('late theme updates an open preview',details().includes('Wildlife'));
+   check('late rating updates filter options',[...$('difficulty').options].some(x=>x.value==='Level 3'));
+   $('preview-close').click();$('difficulty').value='Level 3';$('difficulty').dispatchEvent(new Event('change',{bubbles:true}));
+   check('verified rating can be filtered',$('grid').textContent.includes('Owl Face')&&!$('grid').textContent.includes('Ghost Face'));
+  }else{
+   check('metadata failure does not block the gallery',!$('guest-app').hidden&&details().includes('Not rated'));
+  }
+  $('online-search').value='owl';$('online-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+  await wait(()=>$('online-results').querySelector('.image-open'));
+  $('online-results').querySelector('.image-open').click();
+  check('online preview replaces previous details',details().includes('Example')&&details().includes('Online idea')&&!details().includes('Level 3')&&!details().includes('Additional collection'));
+  $('preview-close').click();$('quick-all').click();
+  [...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes('Cat Face')).querySelector('.image-open').click();
+  check('catalog rating is labeled unverified',details().includes('Catalog difficulty')&&details().includes('Easy')&&details().includes('source not verified'));
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('late source ratings update the private gallery and open preview', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(detailsDriver,'guest.html','?delayDetails'));
+test('private gallery remains usable if ratings fail to load', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(detailsDriver,'guest.html','?failDetails'));
 
 const organizerDriver = `<script>
 (async()=>{
