@@ -60,6 +60,10 @@ const importDriver = `<script>
  const action=(name)=>[...card().querySelectorAll('button')].find(b=>b.textContent.includes(name));
  try{
   await wait(()=>!$('guest-app').hidden && $('grid').children.length);
+  $('guest-advanced').querySelector('summary').click();
+  check('participant more filters opens', $('guest-advanced').open && getComputedStyle($('theme')).display!=='none');
+  $('guest-advanced').querySelector('summary').click();
+  check('participant more filters closes', !$('guest-advanced').open);
   if(!sessionStorage.getItem('__importStage')){
    $('online-search').value='owl';$('online-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
    await wait(()=>$('online-results').querySelector('.web-import'));
@@ -130,18 +134,19 @@ function fixtureServer(driverScript='') {
   try {
    let content = readFileSync(file);
    if (pathname === '/guest.html') content = Buffer.from(content.toString().replace(/<script type="module" src="guest\.js/, setup+'<script type="module" src="guest.js').replace('</body>',driverScript+'</body>'));
+   if (pathname === '/index.html') content = Buffer.from(content.toString().replace('</body>',driverScript+'</body>'));
    res.setHeader('Content-Type', pathname.endsWith('.js') ? 'text/javascript' : pathname.endsWith('.css') ? 'text/css' : pathname.endsWith('.json') ? 'application/json' : 'text/html');
    res.end(content);
   } catch { res.writeHead(404);res.end(); }
  });
 }
 
-async function runJourney(script) {
+async function runJourney(script, page='guest.html') {
  const server = fixtureServer(script);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const profile=mkdtempSync(path.join(tmpdir(),'pumpkin-browser-'));
  try {
-  const url=`http://127.0.0.1:${server.address().port}/guest.html#invite=${'a'.repeat(43)}`;
+  const url=`http://127.0.0.1:${server.address().port}/${page}#invite=${'a'.repeat(43)}`;
   const args=['--headless','--disable-gpu','--disable-extensions','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-default-browser-check','--no-sandbox','--window-size=375,812','--virtual-time-budget=6000',`--user-data-dir=${profile}`,'--dump-dom',url];
   const result=await new Promise((resolve,reject)=>{
    const child=spawn(browser,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});let stdout='',stderr='';
@@ -159,6 +164,36 @@ async function runJourney(script) {
 
 test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(driver));
 test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
+
+const organizerDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out waiting for organizer');};
+ const $=id=>document.getElementById(id);
+ try{
+  await wait(()=>$('advanced-filters').title);
+  // The fixture has no family session; show the organizer controls without using production credentials.
+  document.body.classList.remove('cloud-gated');
+  $('filter-toggle').click();
+  check('more filters opens and exposes controls '+JSON.stringify({open:$('advanced-filters').open,aria:$('filter-toggle').getAttribute('aria-expanded'),height:$('category').getBoundingClientRect().height,hidden:$('catalog-area').hidden,dialogs:[...document.querySelectorAll('dialog[open]')].map(x=>x.id)}),$('advanced-filters').open && $('filter-toggle').getAttribute('aria-expanded')==='true' && $('category').getBoundingClientRect().height>0);
+  $('filter-toggle').click();
+  check('more filters closes',$('advanced-filters').open===false && $('filter-toggle').getAttribute('aria-expanded')==='false');
+  for(const id of ['search','sticky-search']){
+   // Keep the compact field visible while testing its handler independently of scroll timing.
+   if(id==='sticky-search')$('search').parentElement.append($('sticky-search'));
+   const input=$(id);input.focus({preventScroll:true});
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true}));
+   await new Promise(r=>setTimeout(r,10));
+   check(id+' keeps focus while composing '+JSON.stringify({active:document.activeElement?.id,hidden:input.offsetParent===null,dialogs:[...document.querySelectorAll('dialog[open]')].map(x=>x.id)}),document.activeElement===input);
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+   await new Promise(r=>setTimeout(r,10));
+   check(id+' dismisses focus on Enter',document.activeElement!==input);
+  }
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('organizer filters and Return key work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(organizerDriver,'index.html'));
 
 test('participant controls fit emulated mobile and desktop viewports', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, async () => {
  const server=fixtureServer();

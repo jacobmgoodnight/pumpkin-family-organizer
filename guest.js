@@ -659,7 +659,7 @@ $("empty-reset").addEventListener("click",()=>{
 });
 const guestSuggestions=mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions",dismissOnChoose:true});
 $("search").addEventListener("keydown",event=>{
- if(event.key==="Enter"){
+ if(event.key==="Enter"&&!event.isComposing&&event.keyCode!==229){
    event.preventDefault();
    dismissSearchKeyboard($("search"));
    guestSuggestions.hide();

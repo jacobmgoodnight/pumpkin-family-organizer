@@ -32,4 +32,19 @@ export function init(){
  window.addEventListener("pumpkin:statechange",updatePlaceholder);
  window.addEventListener("pumpkin:cloudready",updatePlaceholder);
  announce();updatePlaceholder();
+ // Let the suggestion handler apply a highlighted choice before dismissing
+ // the keyboard. Ignore Enter while an input method is composing text.
+ for(const field of [search,byId("sticky-search")].filter(Boolean)){
+   field.addEventListener("keydown",event=>{
+     if(event.key!=="Enter"||event.isComposing||event.keyCode===229)return;
+     event.preventDefault();
+     setTimeout(()=>{
+       if(document.activeElement!==field)return;
+       field.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}));
+       field.blur();
+     },0);
+   });
+ }
 }
+
+init();

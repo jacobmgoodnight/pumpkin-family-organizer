@@ -250,12 +250,12 @@ body.cloud-gated main.workspace, body.cloud-gated #sticky-quick-search{display:n
 </head>
 <body>
 <header class="top"><div class="shell"><div class="eyebrow">Goodnight family / Carving night</div><h1>🎃 Pumpkin Organizer</h1><p>Browse designs, save favorites, and choose your pumpkin.</p><div class="header-meta" aria-label="Available carving templates"><span class="meta-pill meta-total"><b id="all-total">2,053</b> carving templates</span><span class="meta-pill"><b id="zp-total">661</b> curated Zombie Pumpkins</span><span class="meta-pill"><b id="extra-total">1,392</b> additional designs</span></div></div></header>
-<div id="sticky-quick-search" class="sticky-quick-search" hidden aria-label="Quick pumpkin search"><div class="sticky-quick-inner"><label for="sticky-search" class="sticky-search-caption">⌕ Search</label><input id="sticky-search" type="search" autocomplete="off" placeholder="Search pumpkin designs…" aria-label="Quick search pumpkin designs"><button type="button" class="button small quiet" id="sticky-filters">Filters ↑</button></div></div>
+<div id="sticky-quick-search" class="sticky-quick-search" hidden aria-label="Quick pumpkin search"><div class="sticky-quick-inner"><label for="sticky-search" class="sticky-search-caption">⌕ Search</label><input id="sticky-search" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search pumpkin designs…" aria-label="Quick search pumpkin designs"><button type="button" class="button small quiet" id="sticky-filters">Filters ↑</button></div></div>
 <main class="shell workspace">
 <section class="profile-panel" aria-labelledby="who"><div class="panel-top"><div><h2 id="who">Who’s picking a pumpkin?</h2><p class="carver-hint">Switch people anytime · favorites stay separate</p></div><button class="button small quiet" id="manage">Manage people</button></div><div class="profiles" id="profiles" role="group" aria-label="Active family member"></div><div id="storage-note" class="notice" hidden>Browser storage is unavailable. Export a backup before closing the page to keep your selections.</div></section>
 <section class="search-hero" id="search-first" aria-labelledby="search-first-heading">
 <div class="search-hero-head"><div><div class="search-hero-eyebrow">2,053 patterns · Browse, save and choose</div><h2 id="search-first-heading">Find your pumpkin</h2></div><button class="button small quiet settings-launch" id="settings-open" type="button" aria-haspopup="dialog" aria-controls="settings-dialog" aria-label="Settings and backups" title="Settings and backups">⚙</button></div>
-<div class="search-hero-search"><div class="control"><label for="search">Search designs</label><input type="search" id="search" placeholder="e.g. black cat, ghost, Mario..." autocomplete="off" aria-describedby="search-help"><span class="search-help" id="search-help">Search by character, subject or name. Suggestions appear as you type.</span></div></div>
+<div class="search-hero-search"><div class="control"><label for="search">Search designs</label><input type="search" id="search" enterkeyhint="search" placeholder="e.g. black cat, ghost, Mario..." autocomplete="off" aria-describedby="search-help"><span class="search-help" id="search-help">Search by character, subject or name. Suggestions appear as you type.</span></div></div>
 <div class="search-hero-footer"><button class="button small quiet" type="button" id="filter-toggle" aria-controls="advanced-filters" aria-expanded="false">☷ More filters <span id="active-filters-label"></span></button><span class="search-hero-hint">Suggestions appear as you type</span></div>
 </section>
 <div class="utility-row"><div class="headline"><h2 id="current-title">Family's pumpkin picks</h2><p id="current-subtitle">Tap any picture to enlarge it; use ♥ to save. Choose a final pattern from My favorites.</p></div></div>
@@ -641,6 +641,6 @@ window.PUMPKIN_FAMILY_BRIDGE = {
 renderFilters();renderAll();if(!persistent)$('storage-note').hidden=false;$('storage-status').textContent='Favorites and final picks are saved in this browser when local-file storage is available. Keep a JSON backup before moving this file or changing browsers.';
 </script>
 <script type="module" src="family-sync.js?v=20261102a"></script>
-<script type="module" src="search-first.js?v=20261029c"></script>
+<script type="module" src="search-first.js?v=20261103c"></script>
 </body>
 </html>
