@@ -24,6 +24,11 @@ const builtinTemplate=id=>/^(?:[a-f0-9]{16}|extra:[a-z0-9-]{1,100})$/.test(id);
 // refresh may already be in flight when the import completes.
 const pendingImports=new Map();
 const pendingChoices=new Set();
+// A retry keeps the intended state, rather than toggling whatever happens to
+// be on screen after a network failure or a household refresh.
+const choiceFailures=new Map();
+let choiceUndo=null;
+let latestChoiceFailure=null;
 let celebrateTimer=null;
 const notice=value=>{$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
@@ -150,7 +155,36 @@ function guestSort(items,mode,q,scores){
  }
  return items.sort((a,b)=>(scores?.get(b.id)??guestScore(b,q))-(scores?.get(a.id)??guestScore(a,q))||(a.source==="zombie"?0:1)-(b.source==="zombie"?0:1)||guestNameCollator.compare(a.name,b.name));
 }
-function filter(){
+function updateEmptyResults(){
+ const empty=$("empty-results");empty.hidden=matches.length!==0;
+ if(empty.hidden)return;
+ const search=$("search").value.trim(),q=normalize(search);
+ const kind=$("filter").value,theme=$("theme").value,difficulty=$("difficulty").value;
+ const own=selectedIsMe(),actions=$("empty-actions");actions.replaceChildren();
+ const hasMatch=(candidateKind,candidateTheme,candidateDifficulty)=>catalog.some(item=>
+   matchesGuestSelection(item,stateFor(item.id),candidateKind,q,own)
+   &&(candidateTheme==="all"||item.category===candidateTheme)
+   &&(candidateDifficulty==="all"||item.difficulty===candidateDifficulty));
+ const offer=(label,changes)=>{
+   const control=document.createElement("button");control.type="button";control.textContent=label;
+   control.addEventListener("click",()=>{
+     for(const [id,value] of Object.entries(changes))$(id).value=value;
+     filter();
+   });
+   actions.append(control);
+ };
+ const canBroaden=hasMatch("all","all","all");
+ $("empty-message").textContent=search
+   ?canBroaden?"No designs match with these filters. Try broadening your view.":"No designs match this search. Try another word or check the spelling."
+   :own?"No designs in this view yet.":"No saved designs in this view yet.";
+ if(kind!=="all"&&hasMatch("all",theme,difficulty))
+   offer(own?(search?"Search all designs":"Browse all designs"):"Show all saved designs",{filter:"all"});
+ if(theme!=="all"&&hasMatch(kind,"all",difficulty))offer("Clear theme",{theme:"all"});
+ if(difficulty!=="all"&&hasMatch(kind,theme,"all"))offer("Clear difficulty",{difficulty:"all"});
+ if(!actions.children.length&&canBroaden&&(kind!=="all"||theme!=="all"||difficulty!=="all"))
+   offer(search?"Clear filters and keep search":"Clear filters",{filter:"all",theme:"all",difficulty:"all"});
+}
+function filter(preserveVisible=false){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
  const theme=$("theme").value,difficulty=$("difficulty").value,scores=new Map();
  matches=catalog.filter(item=>{
@@ -159,7 +193,8 @@ function filter(){
    const score=guestScore(item,q);scores.set(item.id,score);return score>=0;
  });
  guestSort(matches,$("sort").value,q,scores);
- visible=24;render();
+ if(preserveVisible!==true)visible=24;
+ render();
 }
 function selectQuickView(kind){
  // Quick shortcuts return to the complete personal list, including when
@@ -209,6 +244,7 @@ function updateQuickViews(){
  $("guest-search").hidden=!own;
  $("browse-toolbar").hidden=!own;
  $("online-panel").hidden=!own;
+ renderChoiceNotice();
  const term=$("search").value.trim();
  $("browse-online").hidden=!own||term.length<2;
  if(own&&term.length>=2)$("browse-online").textContent="🌐 Find more online for “"+term.slice(0,36)+(term.length>36?"…":"")+"”";
@@ -231,22 +267,78 @@ function createImage(item,click){
  else img.src="app-icon.svg";
  control.append(img);return control;
 }
-async function saveChoice(item,field){
+const sameChoice=(a,b)=>!!a.favorite===!!b.favorite&&!!a.finalPick===!!b.finalPick;
+function refreshChoiceViews(){
+ filter(true);renderLineup();refreshModal();
+ if($("compare-dialog").open)showCompare();
+ renderChoiceNotice();
+}
+function renderChoiceNotice(){
+ let host=$("choice-notice");
+ if(!host){host=document.createElement("div");host.id="choice-notice";host.className="choice-notice";host.setAttribute("role","status");$("guest-app").append(host);}
+ const failure=latestChoiceFailure&&choiceFailures.get(latestChoiceFailure);
+ const ownFailure=failure?.person===me?.personId?failure:null;
+ const ownUndo=choiceUndo?.person===me?.personId?choiceUndo:null;
+ host.replaceChildren();host.hidden=!selectedIsMe()||(!ownFailure&&!ownUndo);
+ if(host.hidden)return;
+ if(ownFailure){
+   const row=document.createElement("div"),text=document.createElement("span");row.className="choice-notice-row";
+   text.textContent=ownFailure.stale?ownFailure.item.name+" changed. Review your selection.":"Could not confirm save for "+ownFailure.item.name+".";
+   row.append(text,ownFailure.stale?button("Dismiss",()=>dismissChoiceFailure(ownFailure.item.id)):button("Try again",()=>void submitChoice(ownFailure.item,ownFailure.next,ownFailure.before,ownFailure.kind)));host.append(row);
+ }
+ if(ownUndo){
+   const row=document.createElement("div"),text=document.createElement("span");row.className="choice-notice-row";
+   text.textContent="Removed "+ownUndo.item.name+" from your favorites and final picks.";
+   row.append(text,button("Undo",()=>{const entry=choiceUndo;choiceUndo=null;void submitChoice(entry.item,entry.before,entry.after,"undo");}));
+   const dismiss=button("×",()=>{choiceUndo=null;refreshChoiceViews();});dismiss.setAttribute("aria-label","Dismiss undo message");row.append(dismiss);host.append(row);
+ }
+}
+function clearChoiceFailure(id){
+ choiceFailures.delete(id);
+ if(latestChoiceFailure===id)latestChoiceFailure=[...choiceFailures.keys()].at(-1)||null;
+}
+function dismissChoiceFailure(id){
+ clearChoiceFailure(id);
+ notice("");refreshChoiceViews();
+}
+async function submitChoice(item,next,expected,kind){
  if(!selectedIsMe()){notice("This is another person's list. You can view and compare, but not change their picks.");return;}
  if(pendingChoices.has(item.id))return;
  const person=me.personId,map=familyChoices.get(person);
- const before=stateFor(item.id,person),next={...before,[field]:!before[field]};
- if(field==="favorite"&&!next.favorite)next.finalPick=false;
- if(field==="finalPick"&&next.finalPick)next.favorite=true;
- pendingChoices.add(item.id);choiceWrites++;choiceGeneration++;map.set(item.id,next);render();renderLineup();refreshModal();
+ const before={...stateFor(item.id,person)};
+ if(!sameChoice(before,expected)){
+   choiceFailures.set(item.id,{person,item,before:expected,next,kind,stale:true});latestChoiceFailure=item.id;if(choiceUndo?.item.id===item.id)choiceUndo=null;refreshChoiceViews();
+   notice("Your selection changed since the last attempt. Please review it before trying again.");return;
+ }
+ clearChoiceFailure(item.id);if(choiceUndo?.item.id===item.id)choiceUndo=null;
+ pendingChoices.add(item.id);choiceWrites++;choiceGeneration++;map.set(item.id,next);refreshChoiceViews();
  try{
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
-   if(field==="finalPick"&&!before.finalPick&&res.finalPick)celebratePick(item);
- }catch(error){map.set(item.id,before);notice("Selection not saved: "+error.message);}
+   if(kind==="remove-both"&&!res.favorite&&!res.finalPick)choiceUndo={person,item,before,after:{favorite:false,finalPick:false}};
+   if(kind==="pick"&&!before.finalPick&&res.finalPick&&selectedIsMe())celebratePick(item);
+ }catch(error){
+   map.set(item.id,before);
+   choiceFailures.set(item.id,{person,item,before,next,kind});
+   latestChoiceFailure=item.id;
+   notice("Could not confirm your selection. Try again beside "+item.name+".");
+ }
  pendingChoices.delete(item.id);choiceWrites=Math.max(0,choiceWrites-1);
- render();renderLineup();refreshModal();
+ refreshChoiceViews();
+}
+function saveChoice(item,field){
+ if(!selectedIsMe()){notice("This is another person's list. You can view and compare, but not change their picks.");return;}
+ if(pendingChoices.has(item.id))return;
+ const before={...stateFor(item.id)},next={...before,[field]:!before[field]};
+ let kind=field==="finalPick"?"pick":"favorite";
+ if(field==="favorite"&&!next.favorite){
+   if(before.finalPick&&!window.confirm("Remove "+item.name+" from your favorites? This will also remove it from your final picks."))return;
+   if(before.finalPick)kind="remove-both";
+   next.finalPick=false;
+ }
+ if(field==="finalPick"&&next.finalPick)next.favorite=true;
+ void submitChoice(item,next,before,kind);
 }
 // The same pumpkin celebration as the main organizer, after a confirmed save.
 function celebratePick(item){
@@ -284,6 +376,18 @@ function itemActions(item){
    const state=stateFor(item.id),read=document.createElement("small");
    read.textContent=state.finalPick?"✓ Their final pick":state.favorite?"♥ Their favorite":"Read only";
    actions.append(read);
+ }
+ const failure=choiceFailures.get(item.id);
+ if(selectedIsMe()&&failure?.person===me?.personId){
+   const message=document.createElement("div");message.className="choice-error";message.setAttribute("role","alert");
+   const text=document.createElement("span");text.textContent=failure.stale?"Selection changed. Please review it.":"Save not confirmed.";
+   const retry=failure.stale?button("Dismiss",()=>dismissChoiceFailure(item.id)):button("Try again",()=>void submitChoice(item,failure.next,failure.before,failure.kind));
+   message.append(text,retry);actions.append(message);
+ }
+ if(selectedIsMe()&&choiceUndo?.person===me?.personId&&choiceUndo.item.id===item.id){
+   const undoNotice=document.createElement("div");undoNotice.className="choice-error";undoNotice.setAttribute("role","status");
+   const text=document.createElement("span");text.textContent="Removed from your final picks.";
+   undoNotice.append(text,button("Undo",()=>{const entry=choiceUndo;choiceUndo=null;void submitChoice(entry.item,entry.before,entry.after,"undo");}));actions.append(undoNotice);
  }
  return actions;
 }
@@ -323,7 +427,7 @@ function render(){
  $("totals").textContent=(person?.name||"Family")+": "+counts.favorites+" favorites · "+counts.picks+" final picks";
  $("read-only").hidden=selectedIsMe();
  updateQuickViews();
- const empty=$("empty-results");empty.hidden=matches.length!==0;
+ updateEmptyResults();
  void images();
 }
 function attachDialogClose(dialog,buttonId){
@@ -377,7 +481,7 @@ function refreshModal(){
        :"Family import · Preview only. Ask the organizer to add the original for printing."
      :"Ask the organizer to locate the original file for a sharp print.";
  const actions=$("preview-actions");actions.replaceChildren();
- if(selectedIsMe())actions.append(actionButton(item,"favorite"),actionButton(item,"finalPick"));
+ if(selectedIsMe())actions.append(itemActions(item));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
  if(item.importId&&item.hasOriginal)actions.append(button("📄 Open / print image",()=>printable(item)));
  if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
@@ -696,10 +800,6 @@ $("search").addEventListener("input",filter);
 for(const [id,kind] of [["quick-all","all"],["quick-favorites","favorite"],["quick-picks","picked"]]){
  $(id).addEventListener("click",()=>selectQuickView(kind));
 }
-$("empty-reset").addEventListener("click",()=>{
- if(selectedIsMe())selectQuickView("all");
- else viewPersonSelection(me.personId);
-});
 const guestSuggestions=mountSmartSuggestions({inputs:[$("search")],getItems:()=>catalog,id:"guest-search-suggestions",dismissOnChoose:true});
 $("search").addEventListener("keydown",event=>{
  if(event.key==="Enter"&&!event.isComposing&&event.keyCode!==229){

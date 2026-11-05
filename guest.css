@@ -34,6 +34,8 @@
 .guest-views button[aria-pressed=true] span{background:#6c5234;color:#fff}
 .guest-empty{border:1px dashed #789179;border-radius:12px;text-align:center;padding:22px 12px;margin:12px 0}
 .guest-empty button{border:1px solid #d4aa70;border-radius:9px;background:#344b39;color:#f5eee4;padding:10px 14px;min-height:44px}
+.guest-empty-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:10px}
+.guest-empty-actions:empty{display:none}
 .toolbar .search{position:relative;overflow:visible}
 #guest-search-suggestions{max-width:100%;box-shadow:0 12px 26px #000b}
 @media(max-width:600px){
@@ -231,3 +233,11 @@
 .guest-views button{flex:1 1 0}
 #browse-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}
 @media(max-width:600px){.guest-search{margin:10px 0 7px}#browse-toolbar{grid-template-columns:1fr}}
+
+/* Keep choice recovery visible even if a filtered card leaves the screen. */
+.choice-error{grid-column:1/-1;display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#ffe0ad;font-size:13px}
+.choice-error button,.choice-notice button{background:#e7a962;color:#18251b;border:1px solid #ecbc7e;border-radius:7px;padding:8px 12px;min-height:42px;font-weight:700;cursor:pointer}
+.choice-notice{position:fixed;z-index:30;bottom:max(12px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(92vw,480px);display:grid;gap:8px;padding:10px 12px;background:#233b2b;border:1px solid #e7a962;border-radius:10px;box-shadow:0 4px 20px #0009;color:#fff;font-size:14px}
+.choice-notice-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.choice-notice-row span{flex:1;min-width:0;overflow-wrap:anywhere}
+#preview-actions .actions{flex:1 1 100%}

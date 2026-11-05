@@ -27,7 +27,7 @@ const household=JSON.parse(sessionStorage.getItem('__mockHousehold')||'null')||{
 window.__searchQueries=[];
 window.__choiceRequests=[];
 window.__feedbackRequests=[];
-window.confirm=()=>true;
+window.confirm=message=>{window.__confirmMessage=message;return window.__confirmChoice!==false;};
 window.open=()=>{const popup={location:{href:''},close(){}};window.__popup=popup;return popup;};
 window.fetch=async (url,opts={})=>{
  if(String(url).includes('guest-catalog.json'))return new Response(JSON.stringify(catalog),{status:200});
@@ -48,10 +48,12 @@ window.fetch=async (url,opts={})=>{
    data={ok:true};
   }else if(body.action==='choice'){
    window.__choiceRequests.push(body);
+   if(window.__failChoice)return new Response(JSON.stringify({error:'Unavailable'}),{status:503});
    if(window.__deferChoice){window.__deferChoice=false;await new Promise(resolve=>window.__resolveChoice=resolve);}
    household.familyChoices=household.familyChoices.filter(x=>x.templateId!==body.templateId);
    household.familyChoices.push({personId:'me',templateId:body.templateId,favorite:body.favorite,finalPick:body.finalPick});
    sessionStorage.setItem('__mockHousehold',JSON.stringify(household));
+   if(window.__lostChoice)throw Error('Response lost after server commit');
    data={favorite:body.favorite,finalPick:body.finalPick};
   }else if(body.action==='import'){
    const imported={id:'import-1',name:'Owl Lantern',category:'Family imports',difficulty:'Medium',tags:[],thumbnail_path:'private/owl.png',original_path:'private/owl.png'};
@@ -183,6 +185,45 @@ const feedbackDriver = `<script>
 })();
 </script>`;
 
+const emptyRecoveryDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
+ const $=id=>document.getElementById(id);
+ const change=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('change',{bubbles:true}));};
+ const search=value=>{$('search').value=value;$('search').dispatchEvent(new Event('input',{bubbles:true}));};
+ const action=name=>[...$('empty-actions').querySelectorAll('button')].find(x=>x.textContent===name);
+ try{
+  await wait(()=>!$('guest-app').hidden&&$('grid').children.length);
+  search('cat');change('theme','Spooky');
+  check('theme recovery offered only when useful',!!action('Clear theme')&&!$('empty-results').hidden);
+  action('Clear theme').click();
+  check('theme recovery preserves search and displays matching result',$('search').value==='cat'&&$('theme').value==='all'&&$('grid').textContent.includes('Cat Face'));
+  change('difficulty','Hard');check('difficulty recovery is offered when useful',!!action('Clear difficulty'));
+  action('Clear difficulty').click();
+  check('difficulty recovery keeps the query and matching design',$('search').value==='cat'&&$('difficulty').value==='all'&&$('grid').textContent.includes('Cat Face'));
+  change('theme','Spooky');change('difficulty','Hard');
+  check('combined recovery appears when both filters block results',!!action('Clear filters and keep search')&&!action('Clear theme')&&!action('Clear difficulty'));
+  action('Clear filters and keep search').click();
+  check('combined recovery keeps search and clears both filters',$('search').value==='cat'&&$('theme').value==='all'&&$('difficulty').value==='all'&&$('grid').textContent.includes('Cat Face'));
+  search('ghost');change('filter','favorite');
+  check('favorite recovery offers to search all designs',!!action('Search all designs'));
+  action('Search all designs').click();
+  check('favorite recovery preserves query and opens the catalog',$('search').value==='ghost'&&$('filter').value==='all'&&$('grid').textContent.includes('Ghost Face'));
+  search('nothingmatchesxyz');change('theme','Animals');
+  check('unmatched query suggests another word without promising useless filter changes',$('empty-message').textContent.includes('another word')&&!$('empty-actions').children.length&&$('search').value==='nothingmatchesxyz');
+  household.people.push({id:'other',name:'Other'});
+  household.familyChoices.push({personId:'other',templateId:'ghost',favorite:true,finalPick:false});
+  $('sync-status').click();await wait(()=>$('person-view').querySelector('option[value="other"]'));
+  change('person-view','other');$('other-picks').click();
+  check('other person offers only their saved designs',!!action('Show all saved designs'));
+  action('Show all saved designs').click();
+  check('recovery respects other person shortlist and read-only mode',$('grid').textContent.includes('Ghost Face')&&!$('grid').textContent.includes('Cat Face')&&!$('read-only').hidden);
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+
 function fixtureServer(driverScript='') {
  return createServer((req,res)=>{
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -218,6 +259,90 @@ async function runJourney(script, page='guest.html', query='') {
  } finally {server.close();try{rmSync(profile,{recursive:true,force:true});}catch{}}
 }
 
+const choiceDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
+ const $=id=>document.getElementById(id);
+ const card=name=>[...$('grid').querySelectorAll('article')].find(x=>x.textContent.includes(name));
+ const action=(element,name)=>[...element.querySelectorAll('button')].find(b=>b.textContent.includes(name));
+ try{
+  await wait(()=>!$('guest-app').hidden&&card('Cat Face'));
+  window.__confirmChoice=false;action(card('Cat Face'),'Saved').click();
+  check('canceling removal leaves the final pick intact',window.__choiceRequests.length===0&&!!action(card('Cat Face'),'Picked')&&window.__confirmMessage.includes('final picks'));
+  window.__confirmChoice=true;action(card('Cat Face'),'Saved').click();
+  await wait(()=>$('choice-notice').textContent.includes('Undo'));
+  check('confirmed removal updates both selections',!window.__choiceRequests.at(-1).favorite&&!window.__choiceRequests.at(-1).finalPick);
+  action($('choice-notice'),'Undo').click();await wait(()=>action(card('Cat Face'),'Picked')&&!action(card('Cat Face'),'Picked').disabled);
+  check('undo restores favorite and final pick',window.__choiceRequests.at(-1).favorite&&window.__choiceRequests.at(-1).finalPick);
+  card('Cat Face').querySelector('.image-open').click();action($('preview-actions'),'Saved').click();
+  await wait(()=>action($('preview-actions'),'Undo'));
+  action($('preview-actions'),'Undo').click();await wait(()=>action($('preview-actions'),'Picked')&&!action($('preview-actions'),'Picked').disabled);
+  check('undo works inside the open preview dialog',window.__choiceRequests.at(-1).favorite&&window.__choiceRequests.at(-1).finalPick);
+  $('preview-close').click();
+  $('quick-picks').click();action(card('Cat Face'),'Saved').click();
+  await wait(()=>$('choice-notice').textContent.includes('Undo'));
+  check('removed final pick leaves the filtered results',!card('Cat Face')&&!$('empty-results').hidden);
+  action($('choice-notice'),'Undo').click();await wait(()=>card('Cat Face')&&action(card('Cat Face'),'Picked'));
+  check('undo restores the filtered final-pick result',!!card('Cat Face'));$('quick-all').click();
+  window.__failChoice=true;action(card('Ghost Face'),'Save').click();
+  await wait(()=>card('Ghost Face').querySelector('.choice-error'));
+  check('failure shows local retry and rolls back optimistic state',!!action(card('Ghost Face'),'Try again')&&!!action(card('Ghost Face'),'Save')&&!action(card('Ghost Face'),'Saved'));
+  check('failure also remains visible when card is offscreen',$('choice-notice').textContent.includes('Ghost Face')&&!!action($('choice-notice'),'Try again'));
+  card('Ghost Face').querySelector('.image-open').click();
+  check('preview offers the same retry',!!action($('preview-actions'),'Try again'));
+  window.__failChoice=false;action($('preview-actions'),'Try again').click();
+  await wait(()=>action($('preview-actions'),'Saved')&&!action($('preview-actions'),'Saved').disabled);
+  check('retry sends the desired favorite state',window.__choiceRequests.at(-1).favorite&&!window.__choiceRequests.at(-1).finalPick&&!$('preview-actions').textContent.includes('Not saved'));
+  window.__failChoice=true;action($('preview-actions'),'Pick').click();await wait(()=>action($('preview-actions'),'Try again'));
+  $('preview-close').click();
+  household.people.push({id:'other',name:'Other'});
+  household.familyChoices.find(x=>x.templateId==='ghost').finalPick=true;
+  $('sync-status').click();await wait(()=>$('person-view').options.length===2&&!!action(card('Ghost Face'),'Picked'));
+  $('person-view').value='other';$('person-view').dispatchEvent(new Event('change',{bubbles:true}));
+  check('own recovery control is hidden while viewing another person',$('choice-notice').hidden);
+  $('person-view').value='me';$('person-view').dispatchEvent(new Event('change',{bubbles:true}));
+  const requestCount=window.__choiceRequests.length;action($('choice-notice'),'Try again').click();
+  check('stale retry cannot overwrite refreshed choices',window.__choiceRequests.length===requestCount&&$('alert').textContent.includes('changed'));
+  action($('choice-notice'),'Dismiss').click();
+  window.__failChoice=true;action(card('Cat Face'),'Picked').click();await wait(()=>card('Cat Face').querySelector('.choice-error'));
+  action(card('Ghost Face'),'Picked').click();await wait(()=>$('choice-notice').textContent.includes('Ghost Face'));
+  window.__failChoice=false;action($('choice-notice'),'Try again').click();
+  await wait(()=>$('choice-notice').textContent.includes('Cat Face'));
+  check('earlier failed selections stay recoverable after retrying the latest',!!action($('choice-notice'),'Try again'));
+  action($('choice-notice'),'Try again').click();await wait(()=>$('choice-notice').hidden);
+  window.__lostChoice=true;action(card('Owl Face'),'Pick').click();
+  await wait(()=>card('Owl Face').querySelector('.choice-error'));
+  const lostRequest=window.__choiceRequests.at(-1);
+  check('lost response does not falsely assert failure',card('Owl Face').textContent.includes('not confirmed'));
+  window.__lostChoice=false;action(card('Owl Face'),'Try again').click();
+  await wait(()=>action(card('Owl Face'),'Picked')&&!action(card('Owl Face'),'Picked').disabled);
+  check('retry after a lost response repeats the same intended state',window.__choiceRequests.at(-1).favorite===lostRequest.favorite&&window.__choiceRequests.at(-1).finalPick===lostRequest.finalPick);
+  if($('celebrate-dialog').open)$('celebrate-dialog').close();
+  action(card('Owl Face'),'Picked').click();await wait(()=>action(card('Owl Face'),'Pick')&&!action(card('Owl Face'),'Pick').disabled);
+  window.__lostChoice=true;action(card('Owl Face'),'Pick').click();await wait(()=>card('Owl Face').querySelector('.choice-error'));
+  window.__lostChoice=false;$('sync-status').click();await wait(()=>action(card('Owl Face'),'Picked'));
+  const beforeReview=window.__choiceRequests.length;action(card('Owl Face'),'Try again').click();
+  check('refresh after a lost response protects the committed selection',window.__choiceRequests.length===beforeReview&&card('Owl Face').textContent.includes('Selection changed'));
+  action(card('Owl Face'),'Dismiss').click();action(card('Owl Face'),'Saved').click();
+  await wait(()=>$('choice-notice').textContent.includes('Undo'));
+  $('choice-notice').querySelector('[aria-label="Dismiss undo message"]').click();
+  check('undo notice can be dismissed without covering the gallery',$('choice-notice').hidden&&!action(card('Owl Face'),'Undo'));
+  action(card('Owl Face'),'Pick').click();await wait(()=>action(card('Owl Face'),'Picked')&&!action(card('Owl Face'),'Picked').disabled);
+  if($('celebrate-dialog').open)$('celebrate-dialog').close();
+  window.__failChoice=true;action(card('Ghost Face'),'Saved').click();await wait(()=>card('Ghost Face').querySelector('.choice-error'));
+  window.__failChoice=false;$('quick-picks').click();action(card('Owl Face'),'Saved').click();
+  await wait(()=>$('choice-notice').textContent.includes('Undo'));
+  check('a filtered-out pick can be undone even with another save to retry',!card('Owl Face')&&!!action($('choice-notice'),'Try again')&&!!action($('choice-notice'),'Undo'));
+  action($('choice-notice'),'Try again').click();await wait(()=>!$('choice-notice').textContent.includes('Try again'));
+  check('retrying a different design keeps Undo available',!!action($('choice-notice'),'Undo'));
+  action($('choice-notice'),'Undo').click();await wait(()=>card('Owl Face')&&action(card('Owl Face'),'Picked'));
+  check('Undo still restores the filtered pick after another retry',!!card('Owl Face'));
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('final picks are protected and failed saves can be retried', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(choiceDriver));
 test('participant shortcuts and search work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(driver));
 test('imported designs remain usable through a stale refresh and page reload', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(importDriver));
 test('family reports and approved corrections work in the private gallery', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(feedbackDriver));
@@ -343,6 +468,8 @@ const organizerDriver = `<script>
 })();
 </script>`;
 test('organizer filters and Return key work in a browser', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(organizerDriver,'index.html'));
+
+test('empty searches offer useful recovery without losing the query or exposing another catalog', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(emptyRecoveryDriver));
 
 test('participant controls fit emulated mobile and desktop viewports', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, async () => {
  const server=fixtureServer();

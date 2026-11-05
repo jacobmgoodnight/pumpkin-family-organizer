@@ -259,7 +259,7 @@ test("Organizer and guest share keyboard-safe offline search suggestions",()=>{
 
 test("Other family profile view exposes only that person's favorites or final picks",()=>{
  const guest=file("guest.js"),page=file("guest.html");
- const start=guest.indexOf("function matchesGuestSelection("),end=guest.indexOf("function filter()",start);
+ const start=guest.indexOf("function matchesGuestSelection("),end=guest.indexOf("function updateDiscoveryFilters()",start);
  assert.ok(start>0&&end>start);
  const fn=new Function("guestScore",guest.slice(start,end)+"return matchesGuestSelection;")(()=>0);
  const item={name:"Skeleton",source:"zombie"};
@@ -281,7 +281,7 @@ test("Other family profile view exposes only that person's favorites or final pi
 
 test("Private Final Pick celebration occurs only following an acknowledged newly saved pick",()=>{
  const guest=file("guest.js"),page=file("guest.html"),css=file("guest.css");
- assert.match(guest,/if\(field==="finalPick"&&!before\.finalPick&&res\.finalPick\)celebratePick\(item\)/);
+ assert.match(guest,/if\(kind==="pick"&&!before\.finalPick&&res\.finalPick&&selectedIsMe\(\)\)celebratePick\(item\)/);
  assert.match(guest,/function celebratePick\(item\)/);
  assert.match(guest,/panel\.showModal\(\)/);
  assert.match(guest,/3100/);

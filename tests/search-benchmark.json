@@ -109,5 +109,55 @@
     ],
     "rankFirst": "Spider",
     "reason": "The exact title should rank ahead of longer title matches."
+  },
+  {
+    "query": "mario",
+    "relevant": ["Mario", "Boo - Super Mario Bros"],
+    "irrelevant": ["Harry Potter"],
+    "rankFirst": "Mario",
+    "reason": "An exact character title should lead, and the franchise title should also match."
+  },
+  {
+    "query": "minecraft",
+    "relevant": ["Minecraft Pumpkin"],
+    "irrelevant": ["Harry Potter"],
+    "reason": "A game title should match its own design, not an unrelated character."
+  },
+  {
+    "query": "harry potter",
+    "relevant": ["Harry Potter"],
+    "irrelevant": ["Mario"],
+    "rankFirst": "Harry Potter",
+    "reason": "The exact character title should lead over less direct matches."
+  },
+  {
+    "query": "princess peach",
+    "relevant": ["Princess Peach"],
+    "irrelevant": ["Princess Leia"],
+    "reason": "Both words matter when searching for a particular princess."
+  },
+  {
+    "query": "skull",
+    "relevant": ["Mythosaur Skull"],
+    "irrelevant": ["Mario"],
+    "reason": "The subject appears directly in the relevant title."
+  },
+  {
+    "query": "dragon",
+    "relevant": ["Dragon Flight"],
+    "irrelevant": ["Mario"],
+    "reason": "The subject appears directly in the relevant title."
+  },
+  {
+    "query": "vampire",
+    "relevant": ["Vexed Vampire"],
+    "irrelevant": ["Mario"],
+    "reason": "The subject appears directly in the relevant title."
+  },
+  {
+    "query": "cat",
+    "relevant": ["Scaredy Cat"],
+    "irrelevant": ["Mario"],
+    "reason": "The subject appears directly in the relevant title."
   }
 ]
