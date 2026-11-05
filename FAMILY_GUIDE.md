@@ -4,6 +4,8 @@
 
 On your private family link, open a built-in design and tap **Wrong or missing search details?** Describe the correction and send it to the organizer. The organizer can open **Settings → Review search reports**, review the suggestion, and save an updated description and tags. To correct a design directly, the organizer can open its preview and choose **Correct search description**. Approved corrections are private to your family and appear on connected devices after they refresh.
 
+For suggested searches to check together, see [Help improve pumpkin search](FAMILY_SEARCH_REVIEW.md). The examples are a starting point for family review, not a claim that the family has already verified them.
+
 **[Open the family organizer](https://jacobmgoodnight.github.io/pumpkin-family-organizer/)**
 
 ## For carving night

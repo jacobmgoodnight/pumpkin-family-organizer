@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark">
 <title>Family Pumpkin Gallery · Goodnight Family</title>
-<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261104c">
+<link rel="icon" href="app-icon.svg"><link rel="stylesheet" href="guest.css?v=20261104d">
 </head><body>
 <header><div class="container head">
  <div><small>🎃 Goodnight Family</small><h1 id="greeting">Pick your pumpkin</h1></div>
@@ -75,8 +75,8 @@
   <button id="browse-online" class="browse-online" type="button" hidden>🌐 Find more for this search</button>
   <div id="grid" class="cards"></div>
   <div id="empty-results" class="guest-empty" hidden>
-   <p>No matching designs in this view yet.</p>
-   <button id="empty-reset" type="button">Browse all designs</button>
+   <p id="empty-message" role="status" aria-live="polite"></p>
+   <div id="empty-actions" class="guest-empty-actions"></div>
   </div>
   <button id="more" class="more" hidden>Show more designs</button>
   <section id="online-panel" class="online-panel online-discovery" aria-labelledby="online-heading">
@@ -137,5 +137,5 @@
  <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
  <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261104c"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261104e"></script>
 </body></html>
