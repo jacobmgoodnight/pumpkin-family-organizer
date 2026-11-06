@@ -164,12 +164,20 @@ Deno.serve(async(request)=>{
        searchOverrides.push(...page.map(x=>({templateId:x.template_id,description:x.description,tags:x.tags})));
        if(page.length<1000)break;
      }
+     // Optional during rollout; an unavailable mapping table must never lock out the gallery.
+     let builtinOriginals:string[]=[];
+     for(let offset=0;offset<5000;offset+=1000){
+       const result=await admin.from("pc_builtin_originals").select("template_id").eq("user_id",uid).order("template_id").range(offset,offset+999);
+       if(result.error){builtinOriginals=[];break;}
+       const page=result.data||[];builtinOriginals.push(...page.map(x=>x.template_id).filter(id=>BUILTIN_TEMPLATE_IDS.has(id)));
+       if(page.length<1000)break;
+     }
      const family=rows.data||[];
      return reply({personId,name:member.data.display_name,expiresAt:invite.expires_at,
        choices:family.filter(x=>x.person_id===personId).map(x=>({template_id:x.template_id,favorite:x.favorite,final_pick:x.final_pick})),
        people:(people.data||[]).map(x=>({id:x.person_id,name:x.display_name})),
        familyChoices:family.map(x=>({personId:x.person_id,templateId:x.template_id,favorite:!!x.favorite,finalPick:!!x.final_pick})),
-       imports:imported.data||[],ideas:ideas.data||[],searchOverrides});
+       imports:imported.data||[],ideas:ideas.data||[],searchOverrides,builtinOriginals});
    }
    if(action==="feedback"){
      const templateId=text(body.templateId,110),note=text(body.note,500)?.trim();
@@ -312,11 +320,20 @@ Deno.serve(async(request)=>{
      }
      return reply({links});
    }
-   const importId=text(body.importId,36);
-   if(!importId||!UUID.test(importId))return fail("Printable unavailable",400);
-   const {data:imported,error:importError}=await admin.from("pc_imports").select("original_path").eq("user_id",uid).eq("id",importId).maybeSingle();
-   if(importError||!imported?.original_path)return fail("Printable unavailable",404);
-   const {data:printed,error:signError}=await admin.storage.from("pc-family-imports").createSignedUrl(imported.original_path,120);
+   const importId=text(body.importId,36),templateId=text(body.templateId,110);
+   let originalPath:string|undefined;
+   if(importId&&UUID.test(importId)){
+     const {data,error}=await admin.from("pc_imports").select("original_path").eq("user_id",uid).eq("id",importId).maybeSingle();
+     if(error||!data?.original_path)return fail("Printable unavailable",404);
+     originalPath=data.original_path;
+   }else if(templateId&&BUILTIN_TEMPLATE.test(templateId)&&BUILTIN_TEMPLATE_IDS.has(templateId)){
+     const {data,error}=await admin.from("pc_builtin_originals").select("original_path").eq("user_id",uid).eq("template_id",templateId).maybeSingle();
+     if(error||!data?.original_path)return fail("Printable unavailable",404);
+     originalPath=data.original_path;
+     if(!originalPath.startsWith(uid+"/imports/builtin-")||originalPath.slice((uid+"/imports/").length).includes("/")||!/\/builtin-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-original\.(?:pdf|jpg|png|webp)$/.test(originalPath))return fail("Printable unavailable",404);
+   }else return fail("Printable unavailable",400);
+   if(!originalPath?.startsWith(uid+"/imports/")||originalPath.includes(".."))return fail("Printable unavailable",404);
+   const {data:printed,error:signError}=await admin.storage.from("pc-family-imports").createSignedUrl(originalPath,120);
    if(signError||!printed?.signedUrl)return fail("Printable unavailable",404);
    return reply({url:printed.signedUrl});
  }catch(error){

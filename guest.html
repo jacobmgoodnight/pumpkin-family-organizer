@@ -33,7 +33,8 @@
    <span id="read-only" class="read-only" hidden>Other people's choices are view-only</span>
   </div>
   <div id="guest-search" class="guest-search">
-   <label class="search"><span>Search designs</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off" enterkeyhint="search" inputmode="search"></label>
+   <label class="search"><span>Search designs</span><input id="search" type="search" placeholder="Ghost, cat, Mario…" autocomplete="off" enterkeyhint="search" inputmode="search" aria-describedby="search-interpretation"></label>
+   <p id="search-interpretation" class="note" role="status" aria-live="polite" hidden></p>
   </div>
   <nav id="guest-views" class="guest-views" aria-label="Your pumpkin views">
    <button id="quick-all" type="button" aria-pressed="true">All designs</button>
@@ -137,5 +138,5 @@
  <h2 id="celebrate-heading">You found your pumpkin!</h2><p id="celebrate-design"></p>
  <div class="celebrate-subtitle">Saved to your final picks. Happy carving!</div></div>
 </dialog>
-<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261104e"></script>
+<script src="cloud-config.js"></script><script type="module" src="guest.js?v=20261106a"></script>
 </body></html>
