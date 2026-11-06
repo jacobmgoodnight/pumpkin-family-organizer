@@ -477,8 +477,8 @@ test('organizer natural-difficulty search explains source labels and respects ac
 const organizerCollectionRecoveryDriver = `<script>
 (async()=>{
  const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
- const wait=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
  const $=id=>document.getElementById(id);
+ const wait=async (fn,label='condition')=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out: '+label+' '+JSON.stringify({source:$('source').value,category:$('category').value,difficulty:$('difficulty').value,query:$('search').value,emptyHidden:$('empty').hidden,recoveryHidden:$('empty-all-collections').hidden,visibleView:document.querySelector('[data-view][aria-pressed="true"]')?.dataset.view,results:$('grid').textContent.slice(0,100)}));};
  const input=value=>{$('search').value=value;$('search').dispatchEvent(new Event('input',{bubbles:true}));};
  const change=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('change',{bubbles:true}));};
  try{
@@ -491,19 +491,16 @@ const organizerCollectionRecoveryDriver = `<script>
   $('empty-all-collections').click();
   check('recovery keeps the original search',$('search').value==='easy ghost'&&$('source').value==='');
   check('real catalog matches are visible',$('grid').textContent.includes('Boo Ghost')&&$('grid').textContent.includes('Happy Ghost'));
-  const familyItem={id:'family:one',cloud_id:'one',source:'family',name:'Moonlit Ghost',category:'Spooky',theme:'Spooky',tags:[],keywords:[],difficulty:'Level 1',thumbnail:'app-icon.svg',path:''};
-  const hardItem={...familyItem,id:'family:two',cloud_id:'two',name:'Owl Face',difficulty:'Hard'};
-  const bridge=window.PUMPKIN_FAMILY_BRIDGE;bridge.setCloudImports([familyItem,hardItem]);
-  change('source','family');change('difficulty','Hard');input('easy ghost');
-  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden);
+  change('source','extra');change('difficulty','Level 5');input('spiderman');
+  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden,'difficulty recovery');
   check('button explains that difficulty will be cleared',$('empty-all-collections').textContent.includes('clears difficulty'));
   $('empty-all-collections').click();
-  check('difficulty reset is explicit and query remains',$('difficulty').value===''&&$('search').value==='easy ghost');
-  const state=bridge.snapshot();state.favorites[state.active]=['family:one'];state.picks[state.active]=[];bridge.applyRemote(state);
+  check('difficulty reset is explicit and query remains',$('difficulty').value===''&&$('search').value==='spiderman'&&$('grid').textContent.includes('Spider-Man'));
+  const bridge=window.PUMPKIN_FAMILY_BRIDGE,state=bridge.snapshot();state.favorites[state.active]=['extra:level1-5ad26b574f15e18027dda110'];state.picks[state.active]=[];bridge.applyRemote(state);
   document.querySelector('[data-view="favorites"]').click();change('source','zombie');input('easy ghost');
-  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden);
+  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden,'favorite recovery');
   $('empty-all-collections').click();
-  check('favorite recovery preserves the scope',$('grid').textContent.includes('Moonlit Ghost')&&!$('grid').textContent.includes('Boo Ghost')&&document.querySelector('[data-view="favorites"]').getAttribute('aria-pressed')==='true');
+  check('favorite recovery preserves the scope',$('grid').textContent.includes('Boo Ghost')&&!$('grid').textContent.includes('Happy Ghost')&&document.querySelector('[data-view="favorites"]').getAttribute('aria-pressed')==='true');
   input('completely-nonexistent-pumpkin-xyz');await wait(()=>!$('empty').hidden);
   check('recovery is hidden when there are no other matches',$('empty-all-collections').hidden);
  }catch(e){checks.push({name:String(e.stack||e),ok:false});}
