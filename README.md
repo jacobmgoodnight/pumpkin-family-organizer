@@ -19,7 +19,7 @@ A private family pumpkin-carving organizer hosted on GitHub Pages. Browse **2,05
 | Saved web ideas | Save source links and externally hosted preview references separately from actual printable imports |
 | Google Images discovery | User-confirmed native-styled cards from SerpApi Google Images via a Supabase Edge Function. The server returns up to 48 results from one search; 12 appear initially, with Show more revealing the rest |
 | Home screen | Web-app manifest and SVG pumpkin icon; no offline service worker or guaranteed offline browsing |
-| Original catalog printing | Local file-path locator; licensed built-in originals are not accessible as PDFs on other devices |
+| Original catalog printing | Local file-path locator; an organizer may explicitly attach an authorized original to its existing design in private storage for family access |
 | Imported file printing | Authorized imported originals use time-limited private storage links; cross-device printing still needs real-world testing |
 
 **Important:** Google Images result cards have been confirmed working by the user. Real PDF uploads, phone/tablet access, and two-device sync have **not** been acceptance-tested with the family's devices.
@@ -28,7 +28,7 @@ A private family pumpkin-carving organizer hosted on GitHub Pages. Browse **2,05
 
 An authenticated **parent organizer** can now open **Family account settings → Share private family links**, select 7, 14 or 30 days (default 30), and generate a separate link for any person. Use **Copy link** or the device's native **Share** sheet to deliver it privately. The app itself does **not** send emails/text messages or require children's emails.
 
-Each link opens [the restricted guest page](guest.html). **Guest features now include tapping artwork for a full-screen preview, saving their own favorites and final picks, comparing up to three designs, browsing the family's read-only favorites and Final Picks, and searching Google Images in native result cards.** They can switch which family member's choices they are viewing, but **can change only their invited profile**. They cannot open parent settings, change others' picks, import files, create links or access the parent password. Built-in original PDFs remain local; authorized imported printables may open with expiring signed URLs.
+Each link opens [the restricted guest page](guest.html). **Guest features include tapping artwork for a full-screen preview, saving their own favorites and final picks, comparing up to three designs, browsing the family's read-only favorites and Final Picks, and searching Google Images in native result cards.** They can switch which family member's choices they are viewing, but **can change only their invited profile**. A guest can request an authorized online-image import through the existing confirmation flow; uploading a file, attaching built-in originals, managing invitations and accessing parent settings remain organizer actions. Imported originals and explicitly attached built-in originals can be opened using expiring signed URLs.
 
 Link security: each 256-bit random bearer token is carried in the URL **fragment**, removed from the guest address bar, held in tab-local session storage, and stored only as a SHA-256 hash on the server. Every request checks which person it belongs to and whether it was revoked or expired. Organizer may **Replace** or **Revoke** immediately. A forwarded link grants the same access to its holder, so share only with the intended person.
 

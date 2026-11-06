@@ -18,9 +18,11 @@ For suggested searches to check together, see [Help improve pumpkin search](FAMI
 6. Select **Choose this pumpkin** for your final design. You can keep multiple final selections; none are removed automatically.
 7. Open **Family lineup** to see everyone's chosen designs and use **Print lineup** for a paper summary.
 
+Searches such as **easy ghost** can also match related descriptions and source level labels. The search explains which labels it uses; those labels have not been independently verified as carving difficulty. Removing a favorite that is also a final pick asks for confirmation, and you can undo the removal.
+
 ## Find the printable pattern
 
-- **Built-in Zombie Pumpkins / Additional Templates:** Select **Find original**. The website tells you the local filename. On the computer with the licensed pattern collection, set the local library root once, copy the path and open it through Finder (macOS) or File Explorer (Windows). The licensed PDFs are **not** on GitHub Pages or automatically accessible from phones.
+- **Built-in Zombie Pumpkins / Additional Templates:** The organizer can select **Find original** to locate the file on the computer or drive. To make an authorized original available through family private links, choose that design's file in the original dialog, confirm permission, and select **Save original privately**. Family members can then choose **Open / print original** from the design. The file is not uploaded automatically; the organizer can replace or remove the private copy without changing anyone's picks.
 - **Family imports:** Select **Open printable**. This accesses an authorized PDF/image in your family's private cloud storage while signed in. The link expires and may need the gallery reopened after a long session.
 - **Preview only:** You can still favorite the design, but there is no printable original available from that card.
 - **Web ideas:** Save a link for inspiration. A Google search preview alone is *not* an imported pattern or a guarantee of a printable original.
@@ -38,8 +40,8 @@ For personal photos, publisher-supplied PDFs or other owned files, use **Import 
 - **Missing photos:** Check that you're signed into the same parent account; refresh the page. All 2,053 original thumbnails have already been uploaded to private storage.
 - **Syncing / offline message:** Your recent selection changes may still be saved on this device and pending upload. Reconnect to the internet and open the app again. Keep a backup before clearing browser storage.
 - **Wrong person selected:** Choose the correct profile *before* favoriting or choosing a design.
-- **Need a backup:** Use the JSON export in Settings. Restoring while signed in can change cloud selections on other family devices.
-- **Can't print a built-in design on a phone:** That phone cannot access the PDFs on another computer. Use the original-file locator on the computer holding the purchased/authorized collection.
+- **Need a backup:** Use the JSON export in Settings for profiles and selections. It does not include your uploaded files, invitations or search corrections. Restoring while signed in can change cloud selections on other family devices.
+- **Can't print a built-in design on a phone:** Ask the organizer to attach its authorized original, or use the original-file locator on the computer holding the collection. A phone cannot directly open another computer's drive.
 
 This app is a private family planner. Honor the creator's or publisher's rights before storing or sharing designs.
 

@@ -394,7 +394,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  // The catalog's source paths refer to actual Zombie Pumpkins folders;
  // the pretty in-organizer category paths are NOT those originals.
  const libraryRootKey='pumpkin_local_library_root';
- let currentPrintItem=null;
+ let currentPrintItem=null,printDialogGeneration=0;
  const printDialog=document.createElement('dialog');
  printDialog.id='pumpkin-original-locator';
  printDialog.style.cssText='width:min(92vw,680px);border:1px solid #a7784c;border-radius:16px;background:#16201c;color:#f9f2e6;padding:22px;box-shadow:0 20px 70px #000b';
@@ -414,7 +414,10 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
  const printControls=document.createElement('div');
  printControls.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center';
  printControls.append(copyPrint,closePrint);
- printDialog.append(printTitle,printHelp,printPath,printHint,setRoot,printControls);
+ const originalLibrary=document.createElement('section');
+ originalLibrary.style.cssText='border-top:1px solid #53665c;margin-top:16px;padding-top:12px';
+ originalLibrary.innerHTML='<strong>Private family original</strong><p>Choose the original PDF or image for this design. It will be available to your family through private links.</p><label>Choose file <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"></label><label style="display:block;margin:10px 0"><input type="checkbox"> I have permission to store and share this file with my family.</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-save>Save original privately</button><button type="button" data-open>Open saved original</button><button type="button" data-remove>Remove saved original</button></div><p role="status" data-status></p>';
+ printDialog.append(printTitle,printHelp,printPath,printHint,setRoot,printControls,originalLibrary);
  document.body.append(printDialog);
  function trueRelativePath(item){
    const source=Array.isArray(item?.sources)
@@ -458,13 +461,59 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
   const item=(link.dataset.originalId&&catalog.find(x=>x.id===link.dataset.originalId))||catalog.find(x=>x.path===relative);
   if(!item||!item.path||item.path.startsWith('https://'))return;
   event.preventDefault();
-  currentPrintItem=item;printTitle.textContent='Find the original: '+item.name;
-  drawPath();printDialog.showModal();
+  currentPrintItem=item;printDialogGeneration++;printTitle.textContent='Find the original: '+item.name;
+  // A previously chosen file and permission apply only to the design for
+  // which they were selected, never to the next dialog the organizer opens.
+  fileInput.value='';builtinRights.checked=false;originalStatus.textContent='';
+  updateBuiltinControls();drawPath();printDialog.showModal();
  },true);
+ let builtins=null,builtinBusy=false;
+ const fileInput=originalLibrary.querySelector('input[type=file]'),builtinRights=originalLibrary.querySelector('input[type=checkbox]');
+ const saveOriginal=originalLibrary.querySelector('[data-save]'),openOriginal=originalLibrary.querySelector('[data-open]'),removeOriginal=originalLibrary.querySelector('[data-remove]'),originalStatus=originalLibrary.querySelector('[data-status]');
+ function updateBuiltinControls(){
+   const has=!!(builtins&&currentPrintItem&&builtins.has(currentPrintItem.id));
+   openOriginal.hidden=removeOriginal.hidden=!has;
+   saveOriginal.disabled=builtinBusy||!owner||!builtins;
+   openOriginal.disabled=removeOriginal.disabled=builtinBusy;
+ }
+ function redrawBuiltin(){bridge.refreshOriginals?.();updateBuiltinControls()}
+ function resetOriginalDialogForAccountChange(){
+   // A file choice and permission belong to the account that made them.
+   // Invalidate pending callbacks before another account can open the dialog.
+   printDialogGeneration++;currentPrintItem=null;fileInput.value='';builtinRights.checked=false;originalStatus.textContent='';
+   if(printDialog.open)printDialog.close();
+   updateBuiltinControls();
+ }
+ window.addEventListener('pumpkin:cloudsignedout',resetOriginalDialogForAccountChange);
+ window.addEventListener('pumpkin:cloudownerchange',resetOriginalDialogForAccountChange);
+ window.PUMPKIN_HAS_BUILTIN_ORIGINAL=id=>!!builtins?.has(id);
+ import('./builtin-originals.js?v=20261106a').then(async mod=>{
+   builtins=mod.createBuiltinOriginals({getOwner:()=>owner,getClient:()=>client});
+   const refresh=async()=>{try{await builtins.refresh()}catch{ /* schema may be unavailable during rollout */ }redrawBuiltin()};
+   window.addEventListener('pumpkin:cloudready',refresh);window.addEventListener('focus',refresh);
+   if(owner)await refresh();else redrawBuiltin();
+ }).catch(()=>{originalStatus.textContent='Private originals are temporarily unavailable.'});
+ saveOriginal.addEventListener('click',async()=>{
+   const item=currentPrintItem,dialogGeneration=printDialogGeneration,file=fileInput.files[0];
+   if(!file||!builtinRights.checked){originalStatus.textContent='Choose a file and confirm permission first.';return}
+   if(!owner||!builtins||!item||builtinBusy)return;
+   builtinBusy=true;updateBuiltinControls();originalStatus.textContent='Saving privately…';
+   try{const result=await builtins.save(item.id,file);if(dialogGeneration===printDialogGeneration&&printDialog.open){fileInput.value='';builtinRights.checked=false;originalStatus.textContent='Saved. Family members can open this original from their private links.'+(result.cleanupFailed?' The previous private file could not be removed.':'')}redrawBuiltin()}
+   catch(error){if(dialogGeneration===printDialogGeneration&&printDialog.open)originalStatus.textContent=error?.code==='ORIGINAL_CONFLICT'?'The saved original changed in another window. Review it and try again.':'Could not save the original. Check your connection and sign-in, then try again.'}
+   finally{builtinBusy=false;updateBuiltinControls()}
+ });
+ openOriginal.addEventListener('click',async()=>{const dialogGeneration=printDialogGeneration;try{await builtins.open(currentPrintItem.id)}catch{if(dialogGeneration===printDialogGeneration&&printDialog.open)originalStatus.textContent='Could not open the original. Check your connection, sign-in and pop-up settings.'}});
+ removeOriginal.addEventListener('click',async()=>{
+   if(!currentPrintItem||builtinBusy||!confirm('Remove this saved original from family access? Your chosen design stays in the lineup.'))return;
+   const item=currentPrintItem,dialogGeneration=printDialogGeneration;builtinBusy=true;updateBuiltinControls();
+   try{const result=await builtins.remove(item.id);if(dialogGeneration===printDialogGeneration&&printDialog.open)originalStatus.textContent='The design and picks remain.'+(result.cleanupFailed?' Its previous file could not be removed from private storage.':' The saved original was removed.');redrawBuiltin()}
+   catch(error){if(dialogGeneration===printDialogGeneration&&printDialog.open)originalStatus.textContent=error?.code==='ORIGINAL_CONFLICT'?'The saved original changed in another window. Review it and try again.':'Could not remove the original. Refresh and try again.'}
+   finally{builtinBusy=false;updateBuiltinControls()}
+ });
  function updateOriginalLabels(){
-   document.querySelectorAll('a.pdf').forEach(a=>{if(!/^https:\/\//i.test(a.getAttribute('href')||'')&&a.textContent!=='Find original ↗')a.textContent='Find original ↗'});
+   document.querySelectorAll('a.pdf').forEach(a=>{if(!/^https:\/\//i.test(a.getAttribute('href')||'')&&a.textContent!=='Find original ↗'&&!window.PUMPKIN_HAS_BUILTIN_ORIGINAL?.(a.dataset.originalId))a.textContent='Find original ↗'});
    const preview=document.getElementById('preview-original');
-   if(preview&&!/^https:\/\//i.test(preview.getAttribute('href')||'')&&preview.textContent.startsWith('Open original'))preview.textContent='Find original file ↗';
+   if(preview&&!window.PUMPKIN_HAS_BUILTIN_ORIGINAL?.(preview.dataset.originalId)&&!/^https:\/\//i.test(preview.getAttribute('href')||'')&&preview.textContent.startsWith('Open original'))preview.textContent='Find original file ↗';
    if(preview&&!/^https:\/\//i.test(preview.getAttribute('href')||'')&&preview.textContent.startsWith('Open PDF'))preview.textContent='Find original PDF ↗';
  }
  const labelsObserver=new MutationObserver(()=>updateOriginalLabels());
@@ -589,7 +638,7 @@ if(!cfg||!bridge||!/^https:\/\//.test(cfg.url)||!/^sb_publishable_/.test(cfg.pub
    if(!failed)uploadDetails.open=false;
  });
  start();
- import('./family-features.js?v=20261104a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
+ import('./family-features.js?v=20261106a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Family library unavailable:',e));
  import('./search-corrections.js?v=20261104a').then(mod=>mod.init({getClient:()=>client,getOwner:()=>owner,bridge})).catch(e=>console.error('Search corrections unavailable:',e));
  import('./search-suggestions.js?v=20261029c').then(mod=>mod.init()).catch(e=>console.error('Local search suggestions unavailable:',e));
 }

@@ -1,4 +1,4 @@
-import {guestSearchScore} from "./guest-search.js?v=20261104c";
+import {guestSearchScore} from "./guest-search.js?v=20261106a";
 import {mountSmartSuggestions} from "./search-suggestions.js?v=20261103b";
 import {createInviteAccess} from "./guest-access.js?v=20261103b";
 // Invite-only family gallery. The token is a single-person bearer capability,
@@ -18,7 +18,7 @@ let catalog=[],library=new Map(),me=null,people=[],viewPerson="",familyChoices=n
 let matches=[],visible=24,compareIds=new Set(),previewCache=new Map(),loadingImages=false,imagesQueued=false;
 let onlineResults=[],onlineShown=0,onlineCache=new Map(),onlinePending=false,onlineQuery="";
 let savedIdeas=[],familyImports=[],sortRandomSeed=0,lastFamilyFingerprint="",familyRefreshing=false,choiceWrites=0,choiceGeneration=0;
-let searchMetadata={},searchOverrides=new Map();
+let searchMetadata={},searchOverrides=new Map(),builtinOriginals=new Set();
 const builtinTemplate=id=>/^(?:[a-f0-9]{16}|extra:[a-z0-9-]{1,100})$/.test(id);
 // Keep confirmed imports visible until a household snapshot contains them. A
 // refresh may already be in flight when the import completes.
@@ -74,6 +74,7 @@ function selectionCount(person=viewPerson){
  return {favorites:states.filter(x=>x.favorite).length,picks:states.filter(x=>x.finalPick).length};
 }
 function setFamilyData(data){
+ builtinOriginals=new Set((Array.isArray(data.builtinOriginals)?data.builtinOriginals:[]).filter(builtinTemplate));
  me=data;
  people=Array.isArray(data.people)?data.people:[{id:data.personId,name:data.name}];
  const newMap=new Map(people.map(p=>[p.id,new Map()]));
@@ -186,6 +187,9 @@ function updateEmptyResults(){
 }
 function filter(preserveVisible=false){
  const q=normalize($("search").value.trim()),kind=$("filter").value;
+ const explanation=globalThis.PUMPKIN_SEARCH.interpretation($("search").value),hint=$("search-interpretation");
+ if(hint.textContent!==explanation)hint.textContent=explanation;
+ hint.hidden=!explanation;
  const theme=$("theme").value,difficulty=$("difficulty").value,scores=new Map();
  matches=catalog.filter(item=>{
    if(!matchesGuestSelection(item,stateFor(item.id),kind,"",selectedIsMe())
@@ -416,7 +420,7 @@ function render(){
    const compare=button(compareIds.has(item.id)?"✓ In comparison":"Compare",()=>addCompare(item),"compare-toggle");
    compare.setAttribute("aria-pressed",String(compareIds.has(item.id)));
    area.append(compare);
-   if(item.importId&&item.hasOriginal)area.append(button("📄 Open / print image",()=>printable(item),"print"));
+   if((item.importId&&item.hasOriginal)||builtinOriginals.has(item.id))area.append(button(item.importId?"📄 Open / print image":"📄 Open / print original",()=>printable(item),"print"));
    if(item.source==="web"&&item.sourceUrl)area.append(sourceLink(item.sourceUrl,"Open source ↗"));
    card.append(area);host.append(card);
  }
@@ -479,13 +483,13 @@ function refreshModal(){
    :item.source==="family"
      ?item.hasOriginal?"Family import · Open the original for printing and check its quality."
        :"Family import · Preview only. Ask the organizer to add the original for printing."
-     :"Ask the organizer to locate the original file for a sharp print.";
+     :builtinOriginals.has(item.id)?"Saved family original · Open it for printing and check its quality.":"Ask the organizer to locate the original file for a sharp print.";
  const actions=$("preview-actions");actions.replaceChildren();
  if(selectedIsMe())actions.append(itemActions(item));
  actions.append(button(compareIds.has(item.id)?"Remove from comparison":"Add to comparison",()=>addCompare(item)));
- if(item.importId&&item.hasOriginal)actions.append(button("📄 Open / print image",()=>printable(item)));
+ if((item.importId&&item.hasOriginal)||builtinOriginals.has(item.id))actions.append(button(item.importId?"📄 Open / print image":"📄 Open / print original",()=>printable(item)));
  if(item.source==="web"&&item.sourceUrl)actions.append(sourceLink(item.sourceUrl,"Open original source ↗"));
- else if(item.source!=="family"){const span=document.createElement("span");span.className="note";span.textContent="Ask the organizer to open the original file for printing.";actions.append(span);}
+ else if(item.source!=="family"&&!builtinOriginals.has(item.id)){const span=document.createElement("span");span.className="note";span.textContent="Ask the organizer to open the original file for printing.";actions.append(span);}
 }
 function showCompare(){
  const host=$("compare-grid");host.replaceChildren();
@@ -503,10 +507,10 @@ function showCompare(){
  void images();
 }
 async function printable(item){
- if(!item.importId||!item.hasOriginal)return;
+ if(!(item.importId&&item.hasOriginal)&&!builtinOriginals.has(item.id))return;
  const popup=window.open("","_blank");
  try{
-   const {url}=await api({action:"print",importId:item.importId});
+   const {url}=await api(item.importId?{action:"print",importId:item.importId}:{action:"print",templateId:item.id});
    if(popup)popup.location.href=url;
    else{const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Tap to open / print saved image";$("alert").replaceChildren(link);}
  }catch(error){if(popup)popup.close();notice(error.message);}
@@ -578,7 +582,7 @@ function familyFingerprint(data){
  const choices=[...(data.familyChoices||data.choices||[])].sort((a,b)=>String(a.personId||a.person_id).localeCompare(String(b.personId||b.person_id))||String(a.templateId||a.template_id).localeCompare(String(b.templateId||b.template_id)));
  const imports=[...(data.imports||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
  const ideas=[...(data.ideas||[])].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
- return JSON.stringify([choices,imports,ideas,data.people||[],data.searchOverrides]);
+ return JSON.stringify([choices,imports,ideas,data.people||[],data.searchOverrides,data.builtinOriginals||[]]);
 }
 function loadFamilySnapshot(data){
  lastFamilyFingerprint=familyFingerprint(data);

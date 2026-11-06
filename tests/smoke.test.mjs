@@ -34,9 +34,11 @@ test("Print action distinguishes local, private and preview-only",()=>{
  const a=html.indexOf("function originalAction("),b=html.indexOf("function cardFor(",a);
  assert.ok(a>0&&b>a);
  const stub=(tag,cls,caption)=>({tag,cls,caption,dataset:{}});
- const fn=new Function("createElement",html.slice(a,b)+"; return originalAction;")(stub);
+ const fn=new Function("createElement","window",html.slice(a,b)+"; return originalAction;")(stub,{PUMPKIN_HAS_BUILTIN_ORIGINAL:id=>id==='saved'});
  const local=fn({id:"one",path:"Templates/local.pdf"});
  assert.equal(local.href,"#");assert.equal(local.dataset.originalId,"one");
+ const saved=fn({id:"saved",path:"Templates/saved.pdf"});
+ assert.equal(saved.href,"#");assert.equal(saved.dataset.originalId,"saved");assert.match(saved.caption,/Open \/ manage original/);
  const hosted=fn({id:"two",path:"https://example.invalid/private.pdf"});
  assert.equal(hosted.href,"https://example.invalid/private.pdf");
  assert.equal(hosted.dataset.originalId,undefined);

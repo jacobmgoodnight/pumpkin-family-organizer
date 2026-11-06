@@ -12,8 +12,6 @@ export function init({getClient,getOwner,bridge}){
 libraryTools.append(toolSummary,ideasBtn,manageBtn,helpBtn);
 actions.append(importBtn,webBtn,libraryTools);
  (document.getElementById("tabs")||document.querySelector(".utility-row")||document.getElementById("catalog-area"))?.after(actions);
- // Search all collections by default; curated Zombie Pumpkins still wins close relevance ties.
- const initialSource=$("source");if(initialSource&&initialSource.value==="zombie"){initialSource.value="";initialSource.dispatchEvent(new Event("change",{bubbles:true}));}
  const panel=make("section","pf-panel");panel.hidden=true;
  const panelHeader=make("div","pf-panel-header"),panelTitle=make("h3","","Find more printable designs"),panelControls=make("div"),panelBody=make("div","pf-panel-body");
  const minimizeBtn=make("button","","− Minimize"),closePanelBtn=make("button","","✕ Close");

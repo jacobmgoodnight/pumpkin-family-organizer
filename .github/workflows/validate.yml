@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  builtin-originals-rls:
+    name: Built-in originals database permissions
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise migration and row-level permissions in an isolated database
+        env:
+          PGPASSWORD: test-only-password
+        run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f tests/builtin-originals-rls.sql
+
   smoke:
     env:
       PUMPKIN_TEST_BROWSER: /usr/bin/google-chrome

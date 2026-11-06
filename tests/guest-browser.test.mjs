@@ -428,6 +428,87 @@ const detailsDriver = `<script>
 test('late source ratings update the private gallery and open preview', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(detailsDriver,'guest.html','?delayDetails'));
 test('private gallery remains usable if ratings fail to load', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(detailsDriver,'guest.html','?failDetails'));
 
+const naturalGuestDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
+ const $=id=>document.getElementById(id);
+ catalog.push({id:'level-one-ghost',name:'Moonlit Ghost',category:'Spooky',difficulty:'Level 1',source:'extra',tags:[]});
+ try{
+  await wait(()=>!$('guest-app').hidden&&$('grid').children.length);
+  const input=value=>{$('search').value=value;$('search').dispatchEvent(new Event('input',{bubbles:true}));};
+  input('easy ghost');
+  check('participant search finds Level 1 ghost',$('grid').textContent.includes('Moonlit Ghost'));
+  check('participant sees an honest explanation',!$('search-interpretation').hidden&&$('search-interpretation').textContent.includes('Level 1')&&$('search-interpretation').textContent.includes('not verified'));
+  $('difficulty').value='Hard';$('difficulty').dispatchEvent(new Event('change',{bubbles:true}));
+  check('participant difficulty filter is preserved',$('difficulty').value==='Hard'&&!$('grid').textContent.includes('Moonlit Ghost'));
+  input('ghost');check('participant explanation clears for a literal query',$('search-interpretation').hidden);
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('participant natural-difficulty search explains source labels and respects active filters', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(naturalGuestDriver));
+
+const naturalOrganizerDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');};
+ const $=id=>document.getElementById(id);
+ try{
+  await wait(()=>$('advanced-filters').title);
+  document.body.classList.remove('cloud-gated');
+  const item=(id,name,difficulty)=>({id:'family:'+id,cloud_id:id,source:'family',name,category:'Spooky',theme:'Spooky',tags:[],keywords:[],difficulty,thumbnail:'app-icon.svg',path:''});
+  window.PUMPKIN_FAMILY_BRIDGE.setCloudImports([item('one','Moonlit Ghost','Level 1'),item('two','Owl Face','Hard')]);
+  $('source').value='family';$('source').dispatchEvent(new Event('change',{bubbles:true}));
+  const input=value=>{$('search').value=value;$('search').dispatchEvent(new Event('input',{bubbles:true}));};
+  input('easy ghost');await wait(()=>$('search-interpretation')&&!$('search-interpretation').hidden);
+  check('organizer finds Level 1 ghost',$('grid').textContent.includes('Moonlit Ghost'));
+  check('organizer explains unverified source label',$('search-interpretation').textContent.includes('Level 1')&&$('search-interpretation').textContent.includes('not verified'));
+  $('difficulty').value='Hard';$('difficulty').dispatchEvent(new Event('change',{bubbles:true}));
+  check('organizer keeps active difficulty filter',$('difficulty').value==='Hard'&&!$('grid').textContent.includes('Moonlit Ghost'));
+  input('ghost');await wait(()=>$('search-interpretation').hidden);
+  check('organizer explanation clears for a literal query',$('search-interpretation').hidden);
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('organizer natural-difficulty search explains source labels and respects active filters', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(naturalOrganizerDriver,'index.html'));
+
+const organizerCollectionRecoveryDriver = `<script>
+(async()=>{
+ const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});
+ const $=id=>document.getElementById(id);
+ const wait=async (fn,label='condition')=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out: '+label+' '+JSON.stringify({source:$('source').value,category:$('category').value,difficulty:$('difficulty').value,query:$('search').value,emptyHidden:$('empty').hidden,recoveryHidden:$('empty-all-collections').hidden,visibleView:document.querySelector('[data-view][aria-pressed="true"]')?.dataset.view,results:$('grid').textContent.slice(0,100)}));};
+ const input=value=>{$('search').value=value;$('search').dispatchEvent(new Event('input',{bubbles:true}));};
+ const change=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('change',{bubbles:true}));};
+ try{
+  await wait(()=>$('advanced-filters').title);
+  document.body.classList.remove('cloud-gated');
+  check('organizer starts with all collections',$('source').value==='');
+  change('source','zombie');
+  input('easy ghost');await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden);
+  check('recovery does not silently change collection',$('source').value==='zombie');
+  $('empty-all-collections').click();
+  check('recovery keeps the original search',$('search').value==='easy ghost'&&$('source').value==='');
+  check('real catalog matches are visible',$('grid').textContent.includes('Boo Ghost')&&$('grid').textContent.includes('Happy Ghost'));
+  change('source','extra');change('difficulty','Level 5');input('spiderman');
+  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden,'difficulty recovery');
+  check('button explains that difficulty will be cleared',$('empty-all-collections').textContent.includes('clears difficulty'));
+  $('empty-all-collections').click();
+  check('difficulty reset is explicit and query remains',$('difficulty').value===''&&$('search').value==='spiderman'&&$('grid').textContent.includes('Spider-Man'));
+  const bridge=window.PUMPKIN_FAMILY_BRIDGE,state=bridge.snapshot();state.favorites[state.active]=['extra:level1-5ad26b574f15e18027dda110'];state.picks[state.active]=[];bridge.applyRemote(state);
+  document.querySelector('[data-view="favorites"]').click();change('source','zombie');input('easy ghost');
+  await wait(()=>!$('empty').hidden&&!$('empty-all-collections').hidden,'favorite recovery');
+  $('empty-all-collections').click();
+  check('favorite recovery preserves the scope',$('grid').textContent.includes('Boo Ghost')&&!$('grid').textContent.includes('Happy Ghost')&&document.querySelector('[data-view="favorites"]').getAttribute('aria-pressed')==='true');
+  input('completely-nonexistent-pumpkin-xyz');await wait(()=>!$('empty').hidden);
+  check('recovery is hidden when there are no other matches',$('empty-all-collections').hidden);
+ }catch(e){checks.push({name:String(e.stack||e),ok:false});}
+ const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);
+})();
+</script>`;
+test('organizer offers query-preserving collection recovery when it helps', { skip: !browser && 'No Chromium-compatible browser found', timeout: 90000 }, () => runJourney(organizerCollectionRecoveryDriver,'index.html'));
+
 const organizerDriver = `<script>
 (async()=>{
  const checks=[];const check=(name,ok)=>checks.push({name,ok:!!ok});

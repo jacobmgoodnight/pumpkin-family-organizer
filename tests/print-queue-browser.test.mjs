@@ -25,7 +25,7 @@ const driver=`<script>
   [...sections[0].querySelectorAll('button')].find(x=>x.textContent.includes('Open original')).click();
   check('family action opens the original by id',opened==='one');
   check('lineup print button does not claim to print originals',$('print-summary').textContent.includes('not patterns'));
-  document.querySelector('[data-view=all]').click();document.querySelector('#grid .preview-open').click();
+  document.querySelector('[data-view=all]').click();$('source').value='zombie';$('source').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#grid .preview-open').click();
   check('preview exposes difficulty even when unrated',!$('preview-difficulty').hidden&&$('preview-difficulty').textContent.startsWith('Difficulty:'));
  }catch(e){checks.push({name:String(e.stack||e),ok:false});}
  const output=document.createElement('pre');output.id='browser-test-output';output.textContent=JSON.stringify(checks);document.body.append(output);

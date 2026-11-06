@@ -6,6 +6,7 @@ import {guestSearchScore} from '../guest-search.js';
 
 const catalog = JSON.parse(readFileSync(new URL('../guest-catalog.json', import.meta.url), 'utf8'));
 const metadata = JSON.parse(readFileSync(new URL('../guest-search-metadata.json', import.meta.url), 'utf8'));
+const details = JSON.parse(readFileSync(new URL('../guest-pattern-details.json', import.meta.url), 'utf8'));
 const matching = (item, query) => {
   const extra = metadata[item.id] || {};
   const organizer = globalThis.PUMPKIN_SEARCH.score({...item, keywords: extra.keywords || []}, query, extra.visual);
@@ -44,4 +45,42 @@ test('standalone and leading pumpkin remain meaningful, and exact titles rank fi
   assert.ok(score({name: 'Pumpkin King'}, 'pumpkin king') > score({name: 'King of Jacks', visual: {description: 'Pumpkin king'}}, 'pumpkin king'));
   assert.equal(score({name: 'King of Jacks'}, 'pumpkin king'), -1);
   assert.ok(score({name: 'Cat Pumpkin'}, 'cat pumpkin') > score({name: 'Cat'}, 'cat pumpkin'));
+});
+
+test('natural difficulty words use source labels and explicit descriptions on both pages', () => {
+  const score = globalThis.PUMPKIN_SEARCH.score;
+  const examples = [
+    [{name: 'Ghost', difficulty: 'Level 1'}, 'easy ghost', true],
+    [{name: 'Ghost', difficulty: 'Level 2'}, 'easy ghost', false],
+    [{name: 'Ghost', difficulty: 'Level 3'}, 'medium ghost', true],
+    [{name: 'Ghost', difficulty: 'Level 5'}, 'advanced ghost', true],
+    [{name: 'Ghost', difficulty: 'Level 4'}, 'hard ghost', false],
+    [{name: 'Ghost', difficulty: ''}, 'easy ghost', false],
+    [{name: 'Ghost', visual: {description:'A simple ghost', tags:[]}}, 'easy ghost', true],
+    [{name: 'Easy Ghost', difficulty: 'Level 5'}, 'easy ghost', true],
+    [{name: 'Ghost', difficulty: 'beginner'}, 'simple ghost', true],
+    [{name: 'Cat', difficulty: 'Level 1'}, 'easy ghost', false],
+    [{name: 'Ghost', tags:['Simple Stories']}, 'easy ghost', false],
+  ];
+  for (const [item, query, matches] of examples) {
+    assert.equal(score(item,query)>=0, matches, `organizer: ${query} ${JSON.stringify(item)}`);
+    assert.equal(guestSearchScore(item,query)>=0, matches, `guest: ${query} ${JSON.stringify(item)}`);
+  }
+  assert.ok(score({name:'Easy Ghost',difficulty:'Level 5'},'easy ghost')>score({name:'Ghost',difficulty:'Level 1'},'easy ghost'));
+  assert.equal(score({name:'Ghost',difficulty:'Level 1'},'easy'),-1, 'standalone word is literal');
+  assert.equal(score({name:'Ghost',difficulty:'Level 1'},'easy hard ghost'),-1, 'conflicting descriptors are literal');
+  assert.doesNotThrow(()=>score({name:'Constructor Ghost'},'constructor ghost'));
+  assert.match(globalThis.PUMPKIN_SEARCH.interpretation('easy ghost'), /Level 1.*not verified/);
+  assert.equal(globalThis.PUMPKIN_SEARCH.interpretation('easy'), '');
+  assert.equal(globalThis.PUMPKIN_SEARCH.interpretation('easy hard ghost'), '');
+});
+
+test('real catalog easy ghost results use source Level 1 without losing literal simple descriptions', () => {
+  const withDetails = catalog.map(item => ({...item,...(details[item.id]||{}),...(metadata[item.id]||{})}));
+  const results = withDetails.filter(item => guestSearchScore(item, 'easy ghost') >= 0);
+  assert.ok(results.some(item => item.name === 'Boo Ghost' && item.difficulty === 'Level 1'));
+  assert.ok(results.some(item => item.name === 'Happy Ghost' && item.difficulty === 'Level 1'));
+  for (const item of withDetails.filter(item => guestSearchScore(item,'simple ghost') >= 0)) {
+    assert.ok(guestSearchScore(item,'easy ghost') >= 0, item.name);
+  }
 });
