@@ -4,7 +4,7 @@
 
 **Quick links:** [Family instructions](FAMILY_GUIDE.md) · [Developer setup and security](DEVELOPER_SETUP.md) · [Schema inventory](supabase/SCHEMA_BASELINE.md) · [Automated tests](.github/workflows/validate.yml)
 
-A private-to-the-family pumpkin-carving planner hosted on GitHub Pages. Browse **2,053 built-in patterns**, compare favorites, and choose each family member's final carving design. The public GitHub repository contains the app's code and catalog metadata, **not the licensed original PDFs or thumbnails**.
+A private family pumpkin-carving organizer hosted on GitHub Pages. Browse **2,053 patterns**, find ideas with smart search, compare each person's favorites, and coordinate final designs using secure, person-specific family invitation links—no children's email accounts needed. The public repository includes code and catalog metadata, **not the licensed original PDFs or thumbnails**.
 
 ## What works today
 
