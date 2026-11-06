@@ -16,7 +16,7 @@ insert into public.pc_accounts values
   ('11111111-1111-4111-8111-111111111111'),
   ('22222222-2222-4222-8222-222222222222');
 
-\ir ../supabase/migrations/20261106193325_builtin_originals.sql
+\ir ../supabase/migrations/20261106200416_builtin_originals.sql
 
 -- These helpers are security invoker, so statements run with the test role.
 create function public.test_assert(ok boolean, message text) returns void
