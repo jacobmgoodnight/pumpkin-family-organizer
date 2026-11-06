@@ -42,6 +42,8 @@ const driver=`<script>
   check('remote change invalidates stale undo',$('choice-undo').hidden&&has('favorites')&&!has('picks'));
   seed();toggleFavorite(item.id);window.dispatchEvent(new Event('pumpkin:cloudownerchange'));
   check('account change dismisses undo',$('choice-undo').hidden);
+  await new Promise(r=>setTimeout(r,50));
+  check('local organizer remains visible after deferred scripts initialize',!document.body.classList.contains('cloud-gated')&&document.querySelector('main.workspace').getBoundingClientRect().height>0);
   seed();$('search').value=item.name;renderGallery();
   let heart=[...$('grid').querySelectorAll('.heart')].find(b=>b.dataset.choiceId===item.id);
   heart.focus();heart.click();
@@ -75,7 +77,11 @@ const driver=`<script>
 test('organizer protects final picks and supports safe undo', {skip:!browser&&'No Chromium-compatible browser found',timeout:90000},async()=>{
  const server=createServer((req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
-  try{let data=readFileSync(path.join(root,pathname.slice(1)));if(pathname==='/index.html')data=Buffer.from(data.toString().replace('</body>',driver+'</body>'));
+  try{
+   // This is a local-only UI fixture. Prevent the deferred family-sync module from
+   // gating the organizer after the driver's first await or contacting Supabase.
+   let data=pathname==='/cloud-config.js'?Buffer.from('window.PUMPKIN_CLOUD_CONFIG=null;'):readFileSync(path.join(root,pathname.slice(1)));
+   if(pathname==='/index.html')data=Buffer.from(data.toString().replace('</body>',driver+'</body>'));
    res.setHeader('Content-Type',pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.css')?'text/css':'text/html');res.end(data);
   }catch{res.writeHead(404);res.end();}
  });
