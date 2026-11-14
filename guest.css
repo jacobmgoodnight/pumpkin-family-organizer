@@ -252,3 +252,15 @@
  .guest-home .guest-view-picker{grid-column:2;grid-row:1/span 2;align-self:center}
  .guest-home .guest-remember{grid-column:1;margin-top:0}
 }
+.compare-item>button:not(.image-open){background:transparent;border:1px solid #6a896d;border-radius:7px;color:#d1e4d1;padding:7px;font:inherit;font-size:13px;cursor:pointer}
+/* Phone: larger side-by-side comparison and full-height touch targets. */
+@media(pointer:coarse),(max-width:600px){
+ .compare-toggle,.card .print,.compare-item>button{min-height:44px}
+ .access-help>summary{padding-top:14px;padding-bottom:14px}
+}
+@media(min-width:351px) and (max-width:600px){
+ #compare-dialog{width:calc(100vw - 12px);max-width:none;padding:10px}
+ #compare-dialog .compare-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:calc(50% - 4px);gap:8px;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain;padding-bottom:4px}
+ #compare-dialog .compare-grid:has(.compare-item:nth-child(3)){grid-auto-columns:46%}
+ #compare-dialog .compare-item{scroll-snap-align:start;padding:6px;gap:7px}
+}
