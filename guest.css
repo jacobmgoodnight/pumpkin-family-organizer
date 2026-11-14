@@ -241,3 +241,14 @@
 .choice-notice-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .choice-notice-row span{flex:1;min-width:0;overflow-wrap:anywhere}
 #preview-actions .actions{flex:1 1 100%}
+
+/* Phone: bring the first designs higher. Labels stay available to screen readers. */
+@media(max-width:600px){
+ .guest-search .search>span,#browse-toolbar .filter>span,#view-heading{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .guest-search{margin:8px 0 6px}
+ #browse-toolbar{margin-top:8px}
+}
+@media(min-width:351px) and (max-width:600px){
+ .guest-home .guest-view-picker{grid-column:2;grid-row:1/span 2;align-self:center}
+ .guest-home .guest-remember{grid-column:1;margin-top:0}
+}
