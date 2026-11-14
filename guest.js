@@ -6,6 +6,7 @@ import {createInviteAccess} from "./guest-access.js?v=20261103b";
 const config=window.PUMPKIN_CLOUD_CONFIG;
 const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
 const $=id=>document.getElementById(id);
+const plural=(n,one,many)=>n+" "+(n===1?one:many);
 const access=createInviteAccess({
  hash:location.hash,
  baseUrl:location.origin+location.pathname+location.search,
@@ -255,7 +256,7 @@ function updateQuickViews(){
  if(!own){
    const counts=selectionCount(viewPerson);
    $("other-person-title").textContent=who+"'s saved pumpkins";
-   $("other-person-description").textContent=counts.favorites+" favorites · "+counts.picks+" final picks. You can preview and compare, but only "+who+" can change these.";
+   $("other-person-description").textContent=plural(counts.favorites,"favorite","favorites")+" · "+plural(counts.picks,"final pick","final picks")+". You can preview and compare, but only "+who+" can change these.";
    for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],["other-saved","all"]]){
      $(id).setAttribute("aria-pressed",String(kind===selected));
    }
@@ -426,9 +427,9 @@ function render(){
  }
  $("more").hidden=matches.length<=visible;
  $("more").textContent="Show more designs ("+Math.min(24,matches.length-visible)+" next)";
- $("count").textContent=matches.length+" matching designs";
+ $("count").textContent=plural(matches.length,"matching design","matching designs");
  const counts=selectionCount(),person=people.find(x=>x.id===viewPerson);
- $("totals").textContent=(person?.name||"Family")+": "+counts.favorites+" favorites · "+counts.picks+" final picks";
+ $("totals").textContent=(person?.name||"Family")+": "+plural(counts.favorites,"favorite","favorites")+" · "+plural(counts.picks,"final pick","final picks");
  $("read-only").hidden=selectedIsMe();
  updateQuickViews();
  updateEmptyResults();
