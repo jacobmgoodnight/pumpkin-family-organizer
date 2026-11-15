@@ -6,6 +6,8 @@ import {createInviteAccess} from "./guest-access.js?v=20261103b";
 const config=window.PUMPKIN_CLOUD_CONFIG;
 const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
 const $=id=>document.getElementById(id);
+const INVITE_REJECTED="Invitation invalid or expired";
+const REVOKED_MESSAGE="This link has expired or was revoked. Ask the organizer to create and send a new private invitation.";
 const plural=(n,one,many)=>n+" "+(n===1?one:many);
 const access=createInviteAccess({
  hash:location.hash,
@@ -31,7 +33,10 @@ const choiceFailures=new Map();
 let choiceUndo=null;
 let latestChoiceFailure=null;
 let celebrateTimer=null;
-const notice=value=>{$("alert").textContent=value||"";};
+// Set once the server rejects this invitation (revoked or expired). After that,
+// late failures from in-flight requests must not reopen gallery messages.
+let sessionEnded=false;
+const notice=value=>{if(sessionEnded&&value)return;$("alert").textContent=value||"";};
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"?u.href:"";}catch{return""}};
 const button=(label,handler,cls="")=>{
  const b=document.createElement("button");b.type="button";b.textContent=label;
@@ -45,10 +50,21 @@ const api=async body=>{
  if(!response.ok||data.error){
    const error=new Error(data.error||"Connection unavailable");
    error.status=response.status;
+   // Any rejected invitation ends the private session immediately, instead of
+   // leaving a revoked link on an endless "Try again". An import may also be
+   // refused because its 20-minute search ticket expired; that is not a
+   // revoked invitation and keeps the gallery open.
+   if(response.status===401&&(body.action!=="import"||data.error===INVITE_REJECTED))endRevokedSession();
    throw error;
  }
  return data;
 };
+function endRevokedSession(){
+ if(sessionEnded||!me)return;
+ access.invalidate();me=null;
+ showAccessHelp(REVOKED_MESSAGE);
+ sessionEnded=true;
+}
 function normalize(v){return String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");}
 function updateRememberStatus(){
  const saved=access.isRemembered();
@@ -613,8 +629,7 @@ async function refreshFamily(manual=false){
    else $("sync-status").textContent="Synced · checks every 20s";
  }catch(error){
    if(error.status===401){
-     access.invalidate();me=null;
-     showAccessHelp("This link has expired or was revoked. Ask the organizer to create and send a new private invitation.");
+     endRevokedSession();
    }else{
      $("sync-status").textContent="Sync paused · tap to retry";
      if(manual)notice("Could not refresh family selections: "+error.message);
@@ -980,7 +995,7 @@ async function start(){
  }catch(error){
    if(error.status===401){
      access.invalidate();
-     showAccessHelp("This link has expired or was revoked. Ask the organizer to create and send a new private invitation.");
+     showAccessHelp(REVOKED_MESSAGE);
    }else{
      showAccessHelp("The family gallery could not connect. Your private link has not been cleared. Try again.",true);
    }

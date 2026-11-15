@@ -15,12 +15,16 @@ const SESSION='pumpkin-person-invite',REMEMBER='pumpkin-person-invite-remembered
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 test('invitation recovery keeps the remembered person through failed replacement links', {skip:!browser&&'No Chromium-compatible browser found',timeout:120000},async()=>{
- let aStatus=200,bStatus=401,holdB=false,releaseB;const calls=[];
+ let aStatus=200,bStatus=401,holdB=false,releaseB,choiceStatus=0;const calls=[];
  const server=createServer(async(req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
   if(pathname==='/functions/v1/pumpkin-profile-invites'){
    let body='';for await(const chunk of req)body+=chunk;
    const request=JSON.parse(body);calls.push(request.token);
+   const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+   if(request.action==='search'){json(200,{results:[{title:'Cat stencil',source:'Example',thumbnail:'https://pumpkin-test.invalid/cat.jpg',sourceUrl:'https://pumpkin-test.invalid/cat',importTicket:'expired.ticket'}]});return;}
+   if(request.action==='import'){json(401,{error:'Import link expired. Run the image search again.'});return;}
+   if(request.action==='choice'&&choiceStatus){json(choiceStatus,{error:'Invitation invalid or expired'});return;}
    if(request.token===B&&holdB)await new Promise(resolve=>{releaseB=resolve;});
    const status=request.token===A?aStatus:request.token===C?200:request.token===B?bStatus:401;
    res.writeHead(status,{'Content-Type':'application/json'});
@@ -140,5 +144,24 @@ test('invitation recovery keeps the remembered person through failed replacement
   assert.equal(await evaluate("document.getElementById('preview-dialog').open"),false,'revocation closes a dialog in the top layer');
   assert.equal(await stored(),null,'revocation clears remembered access');
   assert.equal(await session(),null,'revocation clears session access');
+  // Revocation can also be discovered by an ordinary action rather than the
+  // background refresh. It must close the gallery instead of offering an
+  // endless "Try again" for a link that will never work again.
+  aStatus=200;await go(`#invite=${A}`);await wait(app,'Alice opens before an action-time revocation');await remember();
+  // An expired 20-minute import ticket is not a revoked invitation.
+  await evaluate("document.getElementById('online-search').value='cat';document.getElementById('online-form').requestSubmit()");
+  await wait(()=>evaluate("!!document.querySelector('#online-results .web-import:not([disabled])')"),'online result offers an import');
+  await evaluate("window.confirm=()=>true;document.querySelector('#online-results .web-import').click()");
+  await wait(()=>evaluate("document.getElementById('online-status').textContent.includes('Import link expired')"),'expired import ticket is explained');
+  assert.equal(await app(),true,'an expired import ticket keeps the gallery open');
+  assert.equal(await stored(),A,'an expired import ticket keeps remembered access');
+  choiceStatus=401;
+  await evaluate("[...document.querySelectorAll('#grid button')].find(b=>/Save/.test(b.textContent)).click()");
+  await wait(help,'revocation discovered by a Save tap shows access help');
+  assert.equal(await app(),false,'action-time revocation hides the gallery');
+  assert.match(await evaluate("document.getElementById('access-required-message').textContent"),/expired or was revoked/);
+  assert.equal(await evaluate("document.getElementById('alert').textContent"),'','no stale save-failure message remains');
+  assert.equal(await stored(),null,'action-time revocation clears remembered access');
+  assert.equal(await session(),null,'action-time revocation clears session access');
  }finally{otherSocket?.close();socket?.close();child.kill();server.close();await sleep(100);try{rmSync(profile,{recursive:true,force:true});}catch{}}
 });
