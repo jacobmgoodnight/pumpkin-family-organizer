@@ -87,3 +87,20 @@ The `pumpkin-profile-invites` Edge Function also supports the guest-only `search
 The `guest` action now additionally returns the family's names and only **favorite/final-pick** states for the same household, excluding account emails and other parent data. The `choice` branch remains hard-coded to the verified invitation's `uid` and `personId`, so selecting another person's view in guest.js has no corresponding write power. The portal includes a preview dialog, comparison dialog, read-only family lineup and signed previews. Manual testing should include changing the selected member then attempting a write (UI disabled and server always binds write to the invite's person), and separately testing that a revoked/expired token rejects searches.
 
 The phone-only organizer header now uses mobile-scoped CSS and asset version markers; desktop layout remains unchanged. It is important to test actual iPhone Safari rather than assuming CSS checks prove the visual layout.
+
+
+## Link renewal function (November 16, 2026)
+
+`supabase/functions/pumpkin-invite-renewal/index.ts` is deployed separately from `pumpkin-profile-invites`, with `verify_jwt: false`. Like the main function, it checks every request itself:
+- `list` and `extend` require the real parent JWT and a `pc_accounts` row.
+- `status` takes a family member's token and only reports `active`, `expired` (with that person's display name), `replaced` or `unknown`.
+
+Extending updates `expires_at` on the existing hashed invitation, so the same link keeps working; it never shortens a link and cannot revive a revoked one. Deploy with:
+
+```bash
+supabase functions deploy pumpkin-invite-renewal --no-verify-jwt --project-ref wljddcebgmqzrgxjebkn
+```
+
+Tests: `tests/invite-extend-endpoint.test.mjs` (server), `tests/invite-extend-organizer.test.mjs` (organizer panel), `tests/guest-access.test.mjs`, `tests/invitation-regression.test.mjs` and `tests/guest-invitation-browser.test.mjs` (remembering, chooser, expired versus replaced).
+
+Browser tests in this repository use Chrome's `--dump-dom`. In some sandboxes that hangs; point `PUMPKIN_TEST_BROWSER` at Playwright's `chrome-headless-shell` instead. Under that browser, one organizer sticky-search focus check also fails on unchanged code. GitHub Actions uses Google Chrome and is the reference.

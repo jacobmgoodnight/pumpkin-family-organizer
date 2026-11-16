@@ -594,7 +594,7 @@ test('participant controls fit emulated mobile and desktop viewports', { skip: !
   for(const width of [320,375,390,430,768,1440]){
    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<768});
    const layout=await evaluate(`(()=>{
-    const ids=['greeting','identity-heading','person-view','quick-all','quick-favorites','quick-picks','family-lineup','compare-open','search','filter','theme','difficulty','sort','surprise','clear-guest-filters','browse-online','online-search','online-search-button'];
+    const ids=['greeting','identity-heading','switch-person','quick-all','quick-favorites','quick-picks','family-lineup','compare-open','search','filter','theme','difficulty','sort','surprise','clear-guest-filters','browse-online','online-search','online-search-button'];
     const rect=id=>{const e=document.getElementById(id),r=e.getBoundingClientRect();return {id,left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width};};
     const controls=ids.map(rect);return {viewport:window.innerWidth,available:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth,controls};
    })()`);
@@ -607,7 +607,7 @@ test('participant controls fit emulated mobile and desktop viewports', { skip: !
    const overflowing=layout.controls.filter(r=>r.width<=0||r.left < -1||r.right > layout.available+1);
    assert.deepEqual(overflowing,[],`${width}px controls overflow: ${JSON.stringify(overflowing)}`);
    assert.ok(layout.scrollWidth<=layout.available+1,`${width}px page scrolls horizontally (${layout.scrollWidth}px)`);
-   for(const group of [['quick-all','quick-favorites','quick-picks'],['family-lineup','compare-open'],['surprise','clear-guest-filters']]){
+   for(const group of [['quick-all','quick-favorites','quick-picks'],['family-lineup','compare-open','surprise'],['filter','theme','difficulty','sort','clear-guest-filters']]){
     const boxes=layout.controls.filter(r=>group.includes(r.id));
     for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
      const a=boxes[i],b=boxes[j];

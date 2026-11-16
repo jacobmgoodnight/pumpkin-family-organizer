@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {createInviteAccess, SESSION_KEY, REMEMBER_KEY} from "../guest-access.js";
+import {createInviteAccess, SESSION_KEY, REMEMBERED_KEY} from "../guest-access.js";
 
-const A="A".repeat(43), B="B".repeat(43);
+const A="A".repeat(43), B="B".repeat(43), C="C".repeat(43);
 const time=Date.UTC(2026, 10, 2), expiry=new Date(time+86400000).toISOString();
 function storage(){
  const items=new Map();
@@ -12,64 +12,55 @@ function open({token, session=storage(), local=storage()}={}){
  return {session, local, access:createInviteAccess({hash:token===undefined?"":"#invite="+token,
    getSession:()=>session,getPersistent:()=>local,now:()=>time})};
 }
+const tokens=local=>JSON.parse(local.getItem(REMEMBERED_KEY)||"[]").map(x=>x.token);
+const confirm=(env,personId)=>env.access.confirm({personId,name:personId,expiresAt:expiry});
 
 test("an invalid invitation does not open a previously saved family identity",()=>{
  const previous=open({token:A});
- assert.equal(previous.access.remember(expiry).ok,true);
+ assert.equal(confirm(previous,"charlotte").remembered,true);
  const invalid=open({token:"bad-link",session:previous.session,local:previous.local});
  assert.equal(invalid.access.token,null);
  // A bad link should not destroy the valid invitation on the device.
- assert.equal(open({session:previous.session,local:previous.local}).access.token,A);
+ assert.equal(open({local:previous.local}).access.token,A);
 });
 
 test("a revoked or offline replacement does not erase a remembered invitation",()=>{
- const first=open({token:A});first.access.remember(expiry);
+ const first=open({token:A});confirm(first,"charlotte");
  const replacement=open({token:B,session:first.session,local:first.local});
  assert.equal(replacement.access.token,B);
- assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,A);
- // A server rejection clears only the rejected session; network failure does
- // not call invalidate at all. Either way, the old remembered link survives.
+ assert.deepEqual(tokens(first.local),[A]);
+ // A server rejection clears only the rejected link; a network failure does
+ // not call invalidate at all. Either way, the remembered link survives.
  replacement.access.invalidate();
  assert.equal(open({local:first.local}).access.token,A);
 });
 
-test("a confirmed replacement does not erase another tab's newer remembered link",()=>{
- const first=open({token:A});first.access.remember(expiry);
+test("confirming a link never erases another tab's newly remembered person",()=>{
+ const first=open({token:A});confirm(first,"charlotte");
  const replacement=open({token:B,local:first.local});
- const newest=open({token:"C".repeat(43),local:first.local});newest.access.remember(expiry);
- replacement.access.confirm();
- assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,"C".repeat(43));
+ const newest=open({token:C,local:first.local});confirm(newest,"violet");
+ confirm(replacement,"charlotte");
+ assert.deepEqual(tokens(first.local).sort(),[B,C]);
 });
 
-test("offline replacement can validate after reload without restoring the old identity",()=>{
- const first=open({token:A});first.access.remember(expiry);
+test("an offline replacement can validate after reload and then replaces the old link",()=>{
+ const first=open({token:A});confirm(first,"charlotte");
  const replacement=open({token:B,session:first.session,local:first.local});
  const retry=open({session:replacement.session,local:first.local});
  assert.equal(retry.access.token,B);
- retry.access.confirm();
- assert.equal(first.local.getItem(REMEMBER_KEY),null);
- assert.equal(open({session:retry.session,local:first.local}).access.token,B);
-});
-
-test("an offline replacement retry does not erase a newer identity saved in another tab",()=>{
- const first=open({token:A});first.access.remember(expiry);
- const replacement=open({token:B,session:first.session,local:first.local});
- const newest=open({token:"C".repeat(43),local:first.local});newest.access.remember(expiry);
- const retry=open({session:replacement.session,local:first.local});
- retry.access.confirm();
- assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,"C".repeat(43));
+ confirm(retry,"charlotte");
+ assert.deepEqual(tokens(first.local),[B]);
+ assert.equal(open({local:first.local}).access.token,B);
 });
 
 for(const action of ["invalidate","forget"]){
- test(`a stale tab cannot ${action} a different person's newly remembered invitation`,()=>{
-   const first=open({token:A});
-   first.access.remember(expiry);
+ test(`a stale tab cannot ${action} a different person's remembered invitation`,()=>{
+   const first=open({token:A});confirm(first,"charlotte");
    const second=open({token:B,local:first.local});
-   assert.equal(second.access.remember(expiry).ok,true);
-   assert.equal(first.access.isRemembered(),false);
+   assert.equal(confirm(second,"violet").remembered,true);
    first.access[action]();
    assert.equal(first.session.getItem(SESSION_KEY),null);
-   assert.equal(JSON.parse(first.local.getItem(REMEMBER_KEY)).token,B);
+   assert.deepEqual(tokens(first.local),[B]);
    assert.equal(open({local:first.local}).access.token,B);
  });
 }

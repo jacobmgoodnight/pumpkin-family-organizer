@@ -23,8 +23,10 @@ function checkLayout(width) {
    $('quick-favorites').hidden=true;
    const all=rect('quick-all'), picks=rect('quick-picks'), nav=rect('guest-views');
    checks.twoTabsFillRow=Math.abs(all.left-nav.left)<1 && Math.abs(picks.right-nav.right)<1 && Math.abs(all.width-picks.width)<1;
-   const filter=rect('filter'), surprise=rect('surprise'), advanced=rect('guest-advanced');
-   checks.toolbar=innerWidth<=600 ? surprise.top>=filter.bottom && advanced.top>=surprise.bottom : surprise.left>filter.right && advanced.top>=surprise.bottom;
+   // Surprise shares the Family picks row; secondary filters are folded into one panel below it.
+   const lineup=rect('family-lineup'), surprise=rect('surprise'), advanced=rect('guest-advanced');
+   checks.toolbar=Math.abs(surprise.top-lineup.top)<2 && surprise.left>lineup.right && advanced.top>=surprise.bottom && $('guest-advanced').contains($('filter'));
+   checks.identityOneRow=innerWidth<=600 || Math.abs(rect('switch-person').top-rect('identity-heading').top)<12;
    const result=document.createElement('pre');result.id='layout-result';result.textContent=JSON.stringify(checks);document.body.append(result);
   </script>`;
   const html=readFileSync(path.join(root,'guest.html'),'utf8')
