@@ -199,3 +199,29 @@ Private invitation pages open with a compact **Choosing as [name]** identity, li
 
 ### Revoked links close immediately (November 15, 2026)
 If the organizer revokes or replaces a private link while that person is browsing, their next action that reaches the server (saving a favorite, making a Final Pick, loading artwork, opening a printable original, searching online or refreshing) now closes the gallery and shows "This link has expired or was revoked." Previously only the 20-second background refresh noticed, so a tap on Save could show an endless **Try again** and broken artwork. Saved session and remembered-device credentials are cleared at the same moment. An expired 20-minute online-import ticket is not treated as a revoked link: the gallery stays open and asks the person to run the image search again. Front-end only; no Supabase, Edge Function or data changes. Covered by `tests/guest-invitation-browser.test.mjs`; still to confirm on a real phone with a real revoked invitation.
+
+
+### Private links you only open once (November 16, 2026)
+**Remembered automatically.** Once the server confirms a private link, the device remembers that family member, with no button to find. Coming back from history, a bookmark or the Home Screen opens their gallery directly. A shared iPad or a parent's phone can remember several people. With more than one, the page asks **Who's picking a pumpkin?** instead of guessing. **Not you? / Switch person** sits beside the name, and **Forget me on this device** removes only that person. Rejected or offline links never erase someone else's saved link. Links remembered by the earlier opt-in button are upgraded in place.
+
+**Home Screen icons that keep working.** After a first save on a phone, a one-time tip offers **Add to Home Screen**. A Home Screen app may not share Safari's saved data, so while the icon is being added, the private link goes back into the address bar. It's removed again on **Done**, after three minutes, or when leaving the page. There's a new 180 px `apple-touch-icon.png`.
+
+**Extend instead of replace.** The organizer's link panel shows when each link runs out and offers **Extend**, which keeps the same link working. Remembered devices and Home Screen icons keep working too. Recently expired links (up to 30 days) can be extended as well. Extending never shortens a link. **Copy link / Share…** stay available on the organizer device that created a link, saved for that organizer account only and cleared on sign-out, so a lost message doesn't force a Replace.
+
+**Clear explanations.** When a link stops working, the page says whether it **expired** ("ask a parent to tap Extend, then this same link works again", with **Try again**, and the device keeps the link) or was **replaced** (the old link is forgotten).
+
+**Calmer first screen.** The first designs start roughly 150 px higher on phones:
+- one identity row
+- **Family picks / Compare / Surprise me** in one row
+- collection, theme, difficulty and sort folded into **More filters & sorting**, which shows "· 2 on" when active
+- the family-member picker inside the read-only family view
+- one person per row in the family lineup, so design names are readable
+
+Lineup counts now use singular labels ("1 final pick").
+
+**Backend:** a new small Edge Function, `supabase/functions/pumpkin-invite-renewal`, deployed with `verify_jwt: false` and manual checks inside, the same pattern as `pumpkin-profile-invites`:
+- `list` (organizer; includes recently expired links)
+- `extend` (organizer; same token, never shortens)
+- `status` (link holder; `active`, `expired`, `replaced` or `unknown`; a revoked link never reveals whose it was)
+
+`pumpkin-profile-invites` is unchanged. If the new function is unavailable, the organizer panel falls back to the existing live-link list and the private page shows its usual message. No database schema changes. Still to confirm on a real iPhone: the Home Screen icon flow and Extend reviving an expired link.

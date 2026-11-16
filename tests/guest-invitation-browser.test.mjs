@@ -11,27 +11,37 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const browser=findBrowser();
 const A='a'.repeat(43),B='b'.repeat(43),C='c'.repeat(43);
-const SESSION='pumpkin-person-invite',REMEMBER='pumpkin-person-invite-remembered-v1';
+const SESSION='pumpkin-person-invite',REMEMBERED='pumpkin-person-invites-remembered-v2';
+const PEOPLE={[A]:{id:'a',name:'Alice'},[B]:{id:'b',name:'Bella'},[C]:{id:'c',name:'Casey'}};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-test('invitation recovery keeps the remembered person through failed replacement links', {skip:!browser&&'No Chromium-compatible browser found',timeout:120000},async()=>{
- let aStatus=200,bStatus=401,holdB=false,releaseB,choiceStatus=0;const calls=[];
+test('private links are remembered per person, never guessed, and recover from failed links', {skip:!browser&&'No Chromium-compatible browser found',timeout:120000},async()=>{
+ const status={[A]:200,[B]:401,[C]:200},reason={};let holdB=false,releaseB,choiceStatus=0;const calls=[];
  const server=createServer(async(req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
+  if(pathname==='/functions/v1/pumpkin-invite-renewal'){
+   let body='';for await(const chunk of req)body+=chunk;
+   const request=JSON.parse(body);
+   const code=status[request.token]??401;
+   res.writeHead(200,{'Content-Type':'application/json'});
+   res.end(JSON.stringify(code===200&&!choiceStatus?{reason:'active'}:code===200?{reason:'unknown'}:code===401?(reason[request.token]||{reason:'unknown'}):{reason:'unknown'}));return;
+  }
   if(pathname==='/functions/v1/pumpkin-profile-invites'){
    let body='';for await(const chunk of req)body+=chunk;
    const request=JSON.parse(body);calls.push(request.token);
-   const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+   const json=(code,value)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+   if(request.token===B&&holdB)await new Promise(resolve=>{releaseB=resolve;});
+   const code=status[request.token]??401;
+   if(code===401){json(401,{error:'Invitation invalid or expired'});return;}
+   if(code!==200){json(code,{error:'Temporary outage'});return;}
    if(request.action==='search'){json(200,{results:[{title:'Cat stencil',source:'Example',thumbnail:'https://pumpkin-test.invalid/cat.jpg',sourceUrl:'https://pumpkin-test.invalid/cat',importTicket:'expired.ticket'}]});return;}
    if(request.action==='import'){json(401,{error:'Import link expired. Run the image search again.'});return;}
-   if(request.action==='choice'&&choiceStatus){json(choiceStatus,{error:'Invitation invalid or expired'});return;}
-   if(request.token===B&&holdB)await new Promise(resolve=>{releaseB=resolve;});
-   const status=request.token===A?aStatus:request.token===C?200:request.token===B?bStatus:401;
-   res.writeHead(status,{'Content-Type':'application/json'});
-   if(status!==200){res.end(JSON.stringify({error:status===401?'Revoked':'Temporary outage'}));return;}
-   const id=request.token===A?'a':request.token===B?'b':'c';
-   const name={a:'Alice',b:'Bella',c:'Casey'}[id];
-   res.end(JSON.stringify({personId:id,name,expiresAt:'2099-01-01T00:00:00Z',people:[{id,name}],familyChoices:[],imports:[],ideas:[]}));return;
+   if(request.action==='choice'){
+    if(choiceStatus){json(choiceStatus,{error:'Invitation invalid or expired'});return;}
+    json(200,{ok:true,templateId:request.templateId,favorite:request.favorite||request.finalPick,finalPick:request.finalPick});return;
+   }
+   const person=PEOPLE[request.token];
+   json(200,{personId:person.id,name:person.name,expiresAt:'2099-01-01T00:00:00Z',people:[{id:person.id,name:person.name}],familyChoices:[],imports:[],ideas:[]});return;
   }
   if(pathname==='/guest-catalog.json'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify([{id:'cat',name:'Cat',category:'Animals',source:'zombie',tags:[]}]));return;}
   if(pathname==='/guest-search-metadata.json'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{}');return;}
@@ -48,7 +58,7 @@ test('invitation recovery keeps the remembered person through failed replacement
  let browserError=null,browserStderr='';
  child.on('error',error=>{browserError=error;});
  child.stderr.on('data',chunk=>{browserStderr=(browserStderr+chunk.toString()).slice(-32768);});
- let socket,otherSocket;
+ let socket;
  try{
   const portFile=path.join(profile,'DevToolsActivePort'),deadline=Date.now()+25000;
   let port='';
@@ -71,97 +81,129 @@ test('invitation recovery keeps the remembered person through failed replacement
   const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++nextId;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params}));});
   const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(result.exceptionDetails.text);return result.result.value;};
   const wait=async(predicate,description)=>{for(let i=0;i<300;i++){try{if(await predicate())return;}catch{}await sleep(25);}throw Error(`Timed out: ${description}`);};
-  const go=async hash=>{
+  const visible=id=>evaluate(`!!document.getElementById(${JSON.stringify(id)})&&!document.getElementById(${JSON.stringify(id)}).hidden`);
+  const app=()=>visible('guest-app'),help=()=>visible('access-required'),chooser=()=>visible('who-is-picking');
+  const text=id=>evaluate(`document.getElementById(${JSON.stringify(id)}).textContent`);
+  const stored=()=>evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(REMEMBERED)})||'[]').map(x=>x.token)`);
+  const session=()=>evaluate(`sessionStorage.getItem(${JSON.stringify(SESSION)})`);
+  const names=()=>evaluate("[...document.querySelectorAll('#who-people button')].map(b=>b.textContent)");
+  // Clicks that navigate run after the evaluation returns.
+  const tap=expression=>evaluate(`setTimeout(()=>(${expression}).click(),0);true`);
+  const choose=name=>tap(`[...document.querySelectorAll('#who-people button')].find(b=>b.textContent.includes(${JSON.stringify(name)}))`);
+  const go=async(hash,expectRequest=true)=>{
    const count=calls.length;
    // Simulate opening the link from Messages, not a same-document hash change.
    await send('Page.navigate',{url:'about:blank'});
    await send('Page.navigate',{url:`${origin}/guest.html${hash}`});
-   await wait(()=>calls.length>count,'invitation API request');
+   if(expectRequest)await wait(()=>calls.length>count,'invitation API request');
   };
-  const app=()=>evaluate("!!document.getElementById('guest-app')&&!document.getElementById('guest-app').hidden");
-  const help=()=>evaluate("!!document.getElementById('access-required')&&!document.getElementById('access-required').hidden");
-  const stored=()=>evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(REMEMBER)})||'null')?.token||null`);
-  const session=()=>evaluate(`sessionStorage.getItem(${JSON.stringify(SESSION)})`);
-  const remember=async()=>{await evaluate("document.getElementById('remember-device').click()");};
   await send('Page.enable');
-  await go(`#invite=${A}`);await wait(app,'Alice opens');await remember();
-  assert.equal(await stored(),A);assert.equal(await session(),A);
+
+  // Opening a link remembers that person automatically and removes the secret from the address.
+  await go(`#invite=${A}`);await wait(app,'Alice opens');
+  await wait(async()=>(await stored()).length===1,'Alice is remembered');
+  assert.deepEqual(await stored(),[A],'remembered without tapping anything');
   assert.equal(await evaluate('location.hash'),'','private fragment is removed');
-  await go(`#invite=${B}`);await wait(help,'revoked replacement shows help');
-  assert.equal(await stored(),A,'revoked B must not erase remembered A');assert.equal(await session(),null);
-  await go('');await wait(app,'remembered A reopens');assert.equal(calls.at(-1),A);
-  bStatus=503;
-  await go(`#invite=${B}`);await wait(help,'offline replacement shows retry help');
-  assert.equal(await stored(),A,'offline B must not erase remembered A');assert.equal(await session(),B);
-  bStatus=200;
-  await go('');await wait(app,'B validates after an offline reload');assert.equal(calls.at(-1),B);
-  assert.equal(await stored(),null,'successful replacement must stop restoring A on a later session');
-  await remember();assert.equal(await stored(),B,'B can opt in to being remembered');
-  await evaluate('sessionStorage.clear()');await go('');await wait(app,'remembered B opens in a new session');assert.equal(calls.at(-1),B);
-  bStatus=401;await go('');await wait(help,'revoked remembered B shows help');
-  assert.equal(await stored(),null,'revocation clears the rejected remembered token');assert.equal(await session(),null);
-  // A second tab can remember a newer person while B is waiting to reconnect.
-  await go(`#invite=${A}`);await wait(app,'Alice reopens');await remember();
-  bStatus=503;await go(`#invite=${B}`);await wait(help,'B waits for connection');assert.equal(await stored(),A);
-  const second=await(await fetch(`http://127.0.0.1:${port}/json/new?about:blank`,{method:'PUT'})).json();
-  otherSocket=new WebSocket(second.webSocketDebuggerUrl);
-  await new Promise((resolve,reject)=>{otherSocket.addEventListener('open',resolve,{once:true});otherSocket.addEventListener('error',reject,{once:true});});
-  let secondId=0;const secondPending=new Map();
-  otherSocket.addEventListener('message',event=>{const message=JSON.parse(event.data),entry=secondPending.get(message.id);if(!entry)return;secondPending.delete(message.id);message.error?entry.reject(new Error(message.error.message)):entry.resolve(message.result);});
-  const sendOther=(method,params={})=>new Promise((resolve,reject)=>{const id=++secondId;secondPending.set(id,{resolve,reject});otherSocket.send(JSON.stringify({id,method,params}));});
-  const evalOther=async expression=>{const result=await sendOther('Runtime.evaluate',{expression,returnByValue:true});if(result.exceptionDetails)throw Error(result.exceptionDetails.text);return result.result.value;};
-  await sendOther('Page.navigate',{url:`${origin}/guest.html#invite=${C}`});
-  await wait(()=>evalOther("!!document.getElementById('guest-app')&&!document.getElementById('guest-app').hidden"),'Casey opens in another tab');
-  await evalOther("document.getElementById('remember-device').click()");
-  await wait(async()=>(await stored())===C,'second tab remembers C');
-  assert.equal(await stored(),C,'second tab remembers C');
-  bStatus=200;await go('');await wait(app,'B succeeds after C is remembered elsewhere');
-  assert.equal(await stored(),C,'confirming B must preserve the newer C saved in another tab');
+  assert.equal(await text('switch-person'),'Not Alice?');
+
+  // A rejected link for someone else never disturbs a remembered person.
+  await go(`#invite=${B}`);await wait(help,'revoked link shows help');
+  assert.deepEqual(await stored(),[A],'a rejected link never erases a remembered person');
+  assert.equal(await session(),null);
+  await go('');await wait(app,'Alice reopens without her link');assert.equal(calls.at(-1),A);
+
+  // An offline link waits for a retry; once it works, both people are remembered.
+  status[B]=503;
+  await go(`#invite=${B}`);await wait(help,'offline link shows retry help');
+  assert.equal(await visible('retry-access'),true);
+  assert.deepEqual(await stored(),[A],'an offline link does not erase Alice');assert.equal(await session(),B);
+  status[B]=200;
+  await go('');await wait(app,'Bella validates after an offline reload');assert.equal(calls.at(-1),B);
+  assert.deepEqual((await stored()).sort(),[A,B].sort(),'both family members are remembered');
+  assert.equal(await text('switch-person'),'Switch person');
+
+  // With two people remembered, a new visit asks who is picking instead of guessing.
+  await evaluate('sessionStorage.clear()');await go('',false);await wait(chooser,'chooser appears');
+  assert.deepEqual((await names()).sort(),['🎃 Alice','🎃 Bella']);
+  let count=calls.length;
+  await choose('Alice');await wait(app,'Alice chosen');
+  assert.ok(calls.length>count&&calls.at(-1)===A);
+  assert.equal(await text('identity-heading'),'Choosing as Alice');
+  await tap("document.getElementById('switch-person')");await wait(chooser,'Switch person returns to the chooser');
+
+  // A replaced link is forgotten and explained; the other person stays available.
+  status[B]=401;reason[B]={reason:'replaced'};
+  await choose('Bella');await wait(help,'replaced link is explained');
+  assert.match(await text('access-required-heading'),/replaced/);
+  assert.deepEqual(await stored(),[A],'only the replaced link is forgotten');
+  assert.equal(await visible('choose-saved'),true,'someone else can still be chosen');
+  await go('');await wait(app,'the only remembered person opens directly');assert.equal(calls.at(-1),A);
+
+  // An expired link is explained and kept, so a parent's Extend revives the same link.
+  status[B]=200;delete reason[B];
+  await go(`#invite=${B}`);await wait(app,'Bella opens her link again');
+  status[B]=401;reason[B]={reason:'expired',name:'Bella',expiredAt:'2026-11-01T12:00:00Z'};
+  await evaluate("document.getElementById('sync-status').click()");
+  await wait(help,'expired link is explained');
+  assert.match(await text('access-required-heading'),/refresh/);
+  assert.match(await text('access-required-message'),/Bella, your pumpkin link stopped working[\s\S]*Extend/);
+  assert.ok((await stored()).includes(B),'an expired link is kept for Extend');
+  status[B]=200;delete reason[B];
+  await evaluate("document.getElementById('retry-access').click()");await wait(app,'the same link works again after Extend');
+
   // Opening another invite at the same URL may only change the fragment.
   await go(`#invite=${A}`);await wait(app,'Alice opens before same-page switch');
   await evaluate("document.getElementById('preview-dialog').showModal()");
   assert.equal(await evaluate("document.getElementById('preview-dialog').open"),true);
-  holdB=true;const countBeforeHashSwitch=calls.length;
+  holdB=true;count=calls.length;
   await evaluate(`location.hash=${JSON.stringify('#invite='+B)}`);
-  await wait(()=>calls.length>countBeforeHashSwitch&&!!releaseB,'B is being validated after same-page switch');
+  await wait(()=>calls.length>count&&!!releaseB,'B is being validated after same-page switch');
   assert.equal(await app(),false,'previous gallery stays hidden while B is validated');
   assert.equal(await evaluate("document.getElementById('preview-dialog').open"),false,'previous preview closes during validation');
   holdB=false;releaseB();await wait(app,'B opens after same-page fragment change');
   assert.equal(await evaluate("document.getElementById('person-view').value"),'b');
   assert.equal(await evaluate('location.hash'),'','the new fragment is scrubbed without a reload loop');
+
   // A revocation may happen after the family member is already browsing.
-  await go(`#invite=${A}`);await wait(app,'Alice opens before revocation');await remember();
-  assert.equal(await stored(),A,'Alice is remembered before revocation');
+  await go(`#invite=${A}`);await wait(app,'Alice opens before revocation');
   await evaluate("document.getElementById('preview-dialog').showModal()");
-  assert.equal(await evaluate("document.getElementById('preview-dialog').open"),true);
-  aStatus=503;await evaluate("document.getElementById('sync-status').click()");
+  status[A]=503;await evaluate("document.getElementById('sync-status').click()");
   await wait(()=>evaluate("document.getElementById('sync-status').textContent.includes('Sync paused')"),'temporary refresh outage');
   assert.equal(await app(),true,'temporary refresh outage leaves the gallery open');
-  assert.equal(await stored(),A,'temporary refresh outage preserves remembered access');
-  aStatus=401;await evaluate("document.getElementById('sync-status').click()");
+  assert.ok((await stored()).includes(A),'temporary refresh outage keeps Alice remembered');
+  status[A]=401;await evaluate("document.getElementById('sync-status').click()");
   await wait(help,'revocation on refresh shows access help');
   assert.equal(await app(),false,'revocation hides the open gallery');
   assert.equal(await evaluate("document.getElementById('preview-dialog').open"),false,'revocation closes a dialog in the top layer');
-  assert.equal(await stored(),null,'revocation clears remembered access');
+  assert.ok(!(await stored()).includes(A),'revocation forgets Alice');
   assert.equal(await session(),null,'revocation clears session access');
+
   // Revocation can also be discovered by an ordinary action rather than the
   // background refresh. It must close the gallery instead of offering an
   // endless "Try again" for a link that will never work again.
-  aStatus=200;await go(`#invite=${A}`);await wait(app,'Alice opens before an action-time revocation');await remember();
+  status[A]=200;await go(`#invite=${A}`);await wait(app,'Alice opens before an action-time revocation');
   // An expired 20-minute import ticket is not a revoked invitation.
   await evaluate("document.getElementById('online-search').value='cat';document.getElementById('online-form').requestSubmit()");
   await wait(()=>evaluate("!!document.querySelector('#online-results .web-import:not([disabled])')"),'online result offers an import');
   await evaluate("window.confirm=()=>true;document.querySelector('#online-results .web-import').click()");
   await wait(()=>evaluate("document.getElementById('online-status').textContent.includes('Import link expired')"),'expired import ticket is explained');
   assert.equal(await app(),true,'an expired import ticket keeps the gallery open');
-  assert.equal(await stored(),A,'an expired import ticket keeps remembered access');
+  assert.ok((await stored()).includes(A),'an expired import ticket keeps remembered access');
   choiceStatus=401;
   await evaluate("[...document.querySelectorAll('#grid button')].find(b=>/Save/.test(b.textContent)).click()");
   await wait(help,'revocation discovered by a Save tap shows access help');
   assert.equal(await app(),false,'action-time revocation hides the gallery');
-  assert.match(await evaluate("document.getElementById('access-required-message').textContent"),/expired or was revoked/);
-  assert.equal(await evaluate("document.getElementById('alert').textContent"),'','no stale save-failure message remains');
-  assert.equal(await stored(),null,'action-time revocation clears remembered access');
+  assert.match(await text('access-required-message'),/expired or was revoked/);
+  assert.equal(await text('alert'),'','no stale save-failure message remains');
+  assert.ok(!(await stored()).includes(A),'action-time revocation forgets Alice');
   assert.equal(await session(),null,'action-time revocation clears session access');
- }finally{otherSocket?.close();socket?.close();child.kill();server.close();await sleep(100);try{rmSync(profile,{recursive:true,force:true});}catch{}}
+
+  // Forgetting yourself on a shared device asks who is picking; it never opens someone else.
+  choiceStatus=0;
+  await go(`#invite=${A}`);await wait(app,'Alice opens before forgetting');
+  await evaluate("window.confirm=()=>true;document.getElementById('forget').click()");
+  await wait(chooser,'chooser after forgetting');
+  assert.deepEqual(await names(),['🎃 Bella']);
+  assert.ok(!(await stored()).includes(A),'Alice is forgotten on this device');
+ }finally{socket?.close();child.kill();server.close();await sleep(100);try{rmSync(profile,{recursive:true,force:true});}catch{}}
 });

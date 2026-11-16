@@ -252,3 +252,42 @@
  .guest-home .guest-view-picker{grid-column:2;grid-row:1/span 2;align-self:center}
  .guest-home .guest-remember{grid-column:1;margin-top:0}
 }
+/* Calmer private-link home (Nov 15, 2026): one identity line, family member picker
+   inside the family banner, Surprise beside Family picks, secondary filters folded away. */
+.guest-home{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;padding:9px 12px;margin-top:8px}
+.guest-home-heading{flex:1 1 auto;min-width:0}
+.guest-home-heading p{color:#ffd9a3;font-size:12px;margin:3px 0 0}
+.guest-switch{flex:0 0 auto;min-height:40px;padding:6px 12px;border:1px solid #cfa36d;border-radius:9px;background:#38533c;color:#ffe9bf;font-weight:750;font-size:12px;cursor:pointer}
+.switch-note{flex-basis:100%;margin:2px 0 0;font-size:12px;line-height:1.45;color:#d8e3d0}
+.guest-home .read-only{flex-basis:100%}
+.home-tip{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;padding:9px 11px;border:1px solid #d99451;border-radius:11px;background:#2c2416;color:#ffe7c4;font-size:13px;line-height:1.45}
+.home-tip span{flex:1 1 220px}
+.home-tip-actions{display:flex;gap:6px}
+.home-tip button{min-height:40px;padding:6px 12px;border-radius:9px;border:1px solid #e1b27d;background:#40563f;color:#ffe6bd;font-weight:750;cursor:pointer}
+.home-tip #home-tip-dismiss{min-width:40px;padding:6px;background:transparent}
+.guest-nav{display:flex;flex-wrap:wrap;gap:8px}
+.guest-nav #surprise{background:#d69c61;border-color:#f2bd81;color:#1a271c;font-weight:750}
+#browse-toolbar{display:block;margin:8px 0}
+.guest-advanced .advanced-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px}
+.guest-advanced .advanced-grid label{display:grid;gap:5px;font-size:12px;font-weight:700;color:#c5d5c7}
+#browse-toolbar .guest-advanced .filter>span{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:normal}
+#clear-guest-filters{grid-column:1/-1;min-height:44px;border-radius:9px;border:1px solid #876e4c;background:#2d4333;color:#f4eadb;font-size:13px;font-weight:700;cursor:pointer}
+.other-person-banner .guest-view-picker{display:grid;gap:4px;margin-top:10px;font-size:12px;color:#d8e3d0;font-weight:700}
+.other-person-banner .guest-view-picker select{font-size:16px;min-height:44px;padding:6px 8px}
+.who-people{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0}
+.who-people .who-person{min-height:64px;margin:0;font-size:18px;font-weight:800;border-radius:14px}
+#choose-saved{margin-top:8px}
+@media(max-width:600px){
+ .guest-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .guest-nav button{font-size:12px;padding:7px 4px;line-height:1.25}
+ .guest-advanced .advanced-grid{grid-template-columns:1fr 1fr;padding:10px;gap:8px}
+ .guest-home-heading strong{font-size:15px}
+}
+.guest-nav.viewing-other{grid-template-columns:repeat(2,minmax(0,1fr))}
+.lineup-head button{min-height:38px;padding:6px 12px;border:1px solid #658668;border-radius:8px;background:#324c38;color:#ffeacb;font-weight:700;cursor:pointer}
+@media(max-width:600px){
+ /* One family member per row so design names are readable on phones. */
+ .lineup{grid-template-columns:1fr}
+ .lineup-visual{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .lineup-visual-item small{font-size:11px;overflow-wrap:break-word;word-break:normal;hyphens:auto}
+}

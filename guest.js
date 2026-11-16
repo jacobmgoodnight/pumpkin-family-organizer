@@ -5,10 +5,12 @@ import {createInviteAccess} from "./guest-access.js?v=20261103b";
 // not an organizer credential. Only an invited person's choices can be written.
 const config=window.PUMPKIN_CLOUD_CONFIG;
 const API=(config?.url||"")+"/functions/v1/pumpkin-profile-invites";
+const RENEWAL_API=(config?.url||"")+"/functions/v1/pumpkin-invite-renewal";
 const $=id=>document.getElementById(id);
 const INVITE_REJECTED="Invitation invalid or expired";
 const REVOKED_MESSAGE="This link has expired or was revoked. Ask the organizer to create and send a new private invitation.";
 const plural=(n,one,many)=>n+" "+(n===1?one:many);
+const openedWithLink=new URLSearchParams(location.hash.slice(1)).has("invite");
 const access=createInviteAccess({
  hash:location.hash,
  baseUrl:location.origin+location.pathname+location.search,
@@ -54,35 +56,122 @@ const api=async body=>{
    // leaving a revoked link on an endless "Try again". An import may also be
    // refused because its 20-minute search ticket expired; that is not a
    // revoked invitation and keeps the gallery open.
-   if(response.status===401&&(body.action!=="import"||data.error===INVITE_REJECTED))endRevokedSession();
+   if(response.status===401&&(body.action!=="import"||data.error===INVITE_REJECTED)){
+     const why=await linkStatus();
+     // A parent may have just extended the link: that is a hiccup, not a rejection.
+     if(why.reason==="active"){error.status=503;error.message="Connection unavailable";}
+     else{error.info=why;endRevokedSession(why);}
+   }
    throw error;
  }
  return data;
 };
-function endRevokedSession(){
+// Ask why a link was rejected: expired (a parent can extend it, and this same
+// link works again) or replaced. Any problem falls back to the plain message.
+async function linkStatus(){
+ try{
+   const response=await fetch(RENEWAL_API,{method:"POST",headers:{"Content-Type":"application/json","apikey":config?.publishableKey||""},
+     body:JSON.stringify({action:"status",token}),referrerPolicy:"no-referrer",cache:"no-store",signal:AbortSignal.timeout?.(6000)});
+   const data=await response.json();
+   return response.ok&&["expired","replaced","active"].includes(data?.reason)?data:{};
+ }catch{return {};}
+}
+function shortDate(value,withYear=false){
+ const time=Date.parse(value);
+ return Number.isFinite(time)?new Date(time).toLocaleDateString(undefined,withYear?{month:"short",day:"numeric",year:"numeric"}:{month:"short",day:"numeric"}):"";
+}
+// The server says whether a rejected link expired (a parent can extend it, and
+// this same link works again) or was replaced by a newer one.
+function showRejectedLink(info={}){
+ if(info?.reason==="expired"){
+   access.noteExpired(info.expiredAt);
+   const when=shortDate(info.expiredAt),who=typeof info.name==="string"&&info.name?info.name+", your":"Your";
+   showAccessHelp(who+" pumpkin link stopped working"+(when?" on "+when:"")+". Ask a parent to open the organizer and tap Extend. Then this same link works again.",true,"Your link needs a quick refresh");
+   return;
+ }
+ access.invalidate();
+ if(info?.reason==="replaced")showAccessHelp("A parent made a newer link for you, or turned this one off. Open your newest pumpkin link from Messages.",false,"This link was replaced");
+ else showAccessHelp(REVOKED_MESSAGE);
+}
+function endRevokedSession(info){
  if(sessionEnded||!me)return;
- access.invalidate();me=null;
- showAccessHelp(REVOKED_MESSAGE);
+ me=null;
+ showRejectedLink(info);
  sessionEnded=true;
 }
 function normalize(v){return String(v||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"");}
-function updateRememberStatus(){
- const saved=access.isRemembered();
- $("remember-device").hidden=saved;
- $("remember-status").textContent=saved?"✓ Saved on this device until the invitation expires":"";
+function updateDeviceStatus(){
+ const until=shortDate(me?.expiresAt,true);
+ $("device-status").textContent=(access.isRemembered()
+   ?"This device remembers your link, so you can come back without the message."
+   :"This browser can't remember your link (private browsing or saving is turned off). Keep the message with your link, or add it to your Home Screen.")
+   +(until?" It works until "+until+".":"");
+ const others=access.people().some(person=>!person.current);
+ $("switch-person").textContent=others?"Switch person":"Not "+(me?.name||"you")+"?";
+ $("switch-person").setAttribute("aria-label",others?"Switch to another family member on this device":"Not "+(me?.name||"you")+"? How to open your own link");
 }
 function closeGuestDialogs(){
  for(const id of ["preview-dialog","compare-dialog","celebrate-dialog"]){
    const dialog=$(id);if(dialog?.open)dialog.close();
  }
 }
-function showAccessHelp(message,retry=false){
- $("guest-app").hidden=true;
- closeGuestDialogs();
+function showAccessHelp(message,retry=false,heading="Your family link is needed"){
+ $("guest-app").hidden=true;$("who-is-picking").hidden=true;
+ closeGuestDialogs();scrubAddress();
  $("access-required").hidden=false;
+ $("access-required-heading").textContent=heading;
  $("access-required-message").textContent=message;
  $("retry-access").hidden=!retry;
+ $("choose-saved").hidden=!access.people().some(person=>!person.current);
  notice("");
+}
+// A shared device can remember several family members. Never guess: ask.
+function showChooser(note=""){
+ $("guest-app").hidden=true;$("access-required").hidden=true;
+ closeGuestDialogs();
+ const host=$("who-people");host.replaceChildren();
+ for(const person of access.people()){
+   host.append(button("🎃 "+person.name,()=>{
+     if(access.choose(person.index))location.replace(location.pathname+location.search);else showChooser();
+   },"who-person"));
+ }
+ $("who-note").textContent=note||"Tap your name to see your pumpkins.";
+ $("who-is-picking").hidden=false;
+ notice("");
+}
+// Home Screen icon: it must carry the private link, because an app opened from
+// the Home Screen may not share this browser's saved data. The link is put in
+// the address only while the icon is being added, then removed again.
+const HOME_TIP_KEY="pumpkin-home-screen-tip-v1";
+const devicePlatform=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)?"ios":/Android/i.test(navigator.userAgent)?"android":"other";
+const openedFromHomeScreen=()=>window.matchMedia?.("(display-mode: standalone)").matches||navigator.standalone===true;
+let homeScrubTimer=null;
+function scrubAddress(){
+ clearTimeout(homeScrubTimer);homeScrubTimer=null;
+ if(location.hash)history.replaceState(null,"",location.pathname+location.search);
+}
+function homeTipDismissed(){try{return window.localStorage.getItem(HOME_TIP_KEY)==="1";}catch{return true;}}
+function dismissHomeTip(){
+ scrubAddress();
+ try{window.localStorage.setItem(HOME_TIP_KEY,"1");}catch{}
+ $("home-tip").hidden=true;
+}
+function maybeOfferHomeScreen(){
+ if(devicePlatform==="other"||openedFromHomeScreen()||homeTipDismissed()||!access.link()||!$("home-tip").hidden)return;
+ $("home-tip-text").textContent="📲 Put your pumpkins on your Home Screen to open them with one tap.";
+ $("home-tip-show").hidden=false;$("home-tip-done").hidden=true;$("home-tip").hidden=false;
+}
+function startHomeScreen(){
+ const url=access.link();if(!url)return;
+ history.replaceState(null,"",url);
+ $("home-tip-text").textContent=devicePlatform==="ios"
+   ?"Tap Safari's Share button (the square with an arrow), then “Add to Home Screen”. Then tap Done here."
+   :devicePlatform==="android"
+   ?"Open the browser menu (⋮), then “Add to Home screen”. Then tap Done here."
+   :"Bookmark this page now (Ctrl+D, or ⌘D on a Mac). Then tap Done here.";
+ $("home-tip-show").hidden=true;$("home-tip-done").hidden=false;$("home-tip").hidden=false;
+ $("home-tip").scrollIntoView({behavior:"smooth",block:"nearest"});
+ clearTimeout(homeScrubTimer);homeScrubTimer=setTimeout(dismissHomeTip,180000);
 }
 function stateFor(id,person=viewPerson){return familyChoices.get(person)?.get(id)||{favorite:false,finalPick:false};}
 function selectedIsMe(){return viewPerson===me?.personId;}
@@ -112,9 +201,12 @@ function setFamilyData(data){
  }
  choices.value=viewPerson;
  $("greeting").textContent="Pick your pumpkin 🎃";
- $("subtitle").textContent="Private link expires "+new Date(data.expiresAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
- updateRememberStatus();
- $("access-required").hidden=true;
+ // Only mention expiry when it matters: a week or less left.
+ const daysLeft=(Date.parse(data.expiresAt)-Date.now())/86400000;
+ $("subtitle").hidden=!(daysLeft<=7);
+ $("subtitle").textContent=daysLeft<=7?"Your link works until "+shortDate(data.expiresAt)+". Ask a parent to tap Extend so it keeps working.":"";
+ updateDeviceStatus();
+ $("access-required").hidden=true;$("who-is-picking").hidden=true;
  $("guest-app").hidden=false;
 }
 function prepareImports(rows){
@@ -261,11 +353,17 @@ function updateQuickViews(){
    :selected==="favorite"?"My favorites"
    :selected==="picked"?"My final picks":"All designs";
  $("guest-views").hidden=!own;
+ // Personal-only controls step aside while viewing someone else's list.
+ $("switch-person").hidden=!own;
+ if(!own)$("switch-note").hidden=true;
+ $("surprise").hidden=!own;
+ document.querySelector(".guest-nav").classList.toggle("viewing-other",!own);
  $("other-person-banner").hidden=own;
  $("guest-search").hidden=!own;
  $("browse-toolbar").hidden=!own;
  $("online-panel").hidden=!own;
  renderChoiceNotice();
+ updateFilterSummary();
  const term=$("search").value.trim();
  $("browse-online").hidden=!own||term.length<2;
  if(own&&term.length>=2)$("browse-online").textContent="🌐 Find more online for “"+term.slice(0,36)+(term.length>36?"…":"")+"”";
@@ -277,6 +375,12 @@ function updateQuickViews(){
      $(id).setAttribute("aria-pressed",String(kind===selected));
    }
  }
+}
+// The collapsed filter panel says when something inside it is switched on.
+function updateFilterSummary(){
+ const active=[["filter",value=>!["all","favorite","picked"].includes(value)],["theme",value=>value!=="all"],
+   ["difficulty",value=>value!=="all"],["sort",value=>value!=="curated"]].filter(([id,on])=>on($(id).value)).length;
+ $("guest-advanced-summary").textContent=active?"Filters & sorting · "+active+" on":"More filters & sorting";
 }
 function createImage(item,click){
  const control=button("",click,"image-open");control.setAttribute("aria-label","Enlarge "+item.name);
@@ -337,6 +441,7 @@ async function submitChoice(item,next,expected,kind){
    const res=await api({action:"choice",templateId:item.id,favorite:next.favorite,finalPick:next.finalPick});
    map.set(item.id,{favorite:!!res.favorite,finalPick:!!res.finalPick});
    notice("");
+   maybeOfferHomeScreen();
    if(kind==="remove-both"&&!res.favorite&&!res.finalPick)choiceUndo={person,item,before,after:{favorite:false,finalPick:false}};
    if(kind==="pick"&&!before.finalPick&&res.finalPick&&selectedIsMe())celebratePick(item);
  }catch(error){
@@ -574,7 +679,7 @@ function renderLineup(){
    const all=[...(familyChoices.get(person.id)||new Map())];
    const picks=all.filter(([,v])=>v.finalPick),favs=all.filter(([,v])=>v.favorite&&!v.finalPick);
    const label=document.createElement("p");label.className="lineup-count";
-   label.textContent=picks.length+" final picks · "+(picks.length+favs.length)+" favorites";
+   label.textContent=plural(picks.length,"final pick","final picks")+" · "+plural(picks.length+favs.length,"favorite","favorites");
    group.append(name,label);
    const gallery=document.createElement("div");gallery.className="lineup-visual";
    const ordered=[...picks,...favs].slice(0,8);
@@ -589,7 +694,7 @@ function renderLineup(){
      const empty=document.createElement("p");empty.className="note";empty.textContent="No pumpkins chosen yet";gallery.append(empty);
    }
    group.append(gallery);
-   const see=button("See "+person.name+"'s saved pumpkins",()=>{viewPersonSelection(person.id);$("view-heading").scrollIntoView({behavior:"smooth",block:"start"});});
+   const see=button("See "+person.name+"'s saved pumpkins",()=>{setLineupOpen(false);viewPersonSelection(person.id);$("view-heading").scrollIntoView({behavior:"smooth",block:"start"});});
    see.className="lineup-view-all";group.append(see);
    wrap.append(group);
  }
@@ -629,7 +734,7 @@ async function refreshFamily(manual=false){
    else $("sync-status").textContent="Synced · checks every 20s";
  }catch(error){
    if(error.status===401){
-     endRevokedSession();
+     endRevokedSession(error.info);
    }else{
      $("sync-status").textContent="Sync paused · tap to retry";
      if(manual)notice("Could not refresh family selections: "+error.message);
@@ -850,12 +955,13 @@ for(const [id,kind] of [["other-favorites","favorite"],["other-picks","picked"],
 }
 $("more").addEventListener("click",()=>{visible+=24;render();});
 $("compare-open").addEventListener("click",showCompare);
-$("family-lineup").addEventListener("click",()=>{
- const section=$("lineup-section");section.hidden=!section.hidden;
- $("family-lineup").textContent=section.hidden?"👨‍👩‍👧‍👧 Show family picks":"👨‍👩‍👧‍👧 Hide family picks";
- $("family-lineup").setAttribute("aria-expanded",String(!section.hidden));
+function setLineupOpen(open){
+ $("lineup-section").hidden=!open;
+ $("family-lineup").textContent=open?"👨‍👩‍👧‍👧 Hide family picks":"👨‍👩‍👧‍👧 Family picks";
+ $("family-lineup").setAttribute("aria-expanded",String(open));
  renderLineup();
-});
+}
+$("family-lineup").addEventListener("click",()=>setLineupOpen($("lineup-section").hidden));
 $("online-search").addEventListener("input",updateGoogleLink);
 $("online-form").addEventListener("submit",event=>{
  event.preventDefault();
@@ -864,12 +970,16 @@ $("online-form").addEventListener("submit",event=>{
 });
 $("online-more").addEventListener("click",renderOnlineBatch);
 updateGoogleLink();updateOnlineResultSummary();
-$("remember-device").addEventListener("click",()=>{
- if(!me)return;
- const result=access.remember(me.expiresAt);
- $("remember-status").textContent=result.ok?"✓ Access saved on this device until the invitation expires":result.message;
- if(result.ok)updateRememberStatus();
+$("switch-person").addEventListener("click",()=>{
+ if(access.people().some(person=>!person.current)){access.clearSession();location.replace(location.pathname+location.search);return;}
+ $("switch-note").hidden=!$("switch-note").hidden;
 });
+$("choose-saved").addEventListener("click",()=>showChooser());
+$("home-screen").addEventListener("click",startHomeScreen);
+$("home-tip-show").addEventListener("click",startHomeScreen);
+$("home-tip-done").addEventListener("click",()=>{dismissHomeTip();notice("📲 Added? Open your pumpkins from the new icon next time.");});
+$("home-tip-dismiss").addEventListener("click",dismissHomeTip);
+window.addEventListener("pagehide",scrubAddress);
 $("copy-link").addEventListener("click",async()=>{
  const url=access.link();
  if(!url)return;
@@ -889,8 +999,11 @@ $("share-link").addEventListener("click",async()=>{
  catch(error){if(error.name!=="AbortError")$("access-help-status").textContent="Sharing unavailable; try Copy link.";}
 });
 $("forget").addEventListener("click",()=>{
- access.forget();
- location.replace(location.pathname+location.search);
+ if(!confirm("Forget "+(me?.name||"your link")+" on this device? You'll need your link from Messages to come back."))return;
+ access.forget();me=null;
+ // Never jump straight into someone else's pumpkins after forgetting.
+ if(access.people().length)showChooser();
+ else location.replace(location.pathname+location.search);
 });
 $("retry-access").addEventListener("click",()=>void start());
 attachDialogClose($("preview-dialog"),"preview-close");
@@ -978,7 +1091,10 @@ function applySearchCorrections(){
  if(openedItem&&$("preview-dialog").open){openedItem=library.get(openedItem.id)||openedItem;refreshModal();}
 }
 async function start(){
- if(!token){showAccessHelp("Open your personal link from Messages. If it expired or you're using a new phone, ask the organizer to resend or regenerate your invitation.");return;}
+ if(!token){
+   if(access.people().length){showChooser(openedWithLink?"That link looks incomplete. Tap your name, or open the full link from Messages.":"");return;}
+   showAccessHelp(openedWithLink?"That link looks incomplete. Open the full pumpkin link from Messages, or ask a parent to send it again.":"Open your personal link from Messages. If it expired or you're using a new phone, ask the organizer to resend or regenerate your invitation.");return;
+ }
  if(!config?.url||!config?.publishableKey){showAccessHelp("The family gallery is temporarily unavailable. Your private invitation is still saved.",true);return;}
  try{
    notice("Opening your private family gallery…");
@@ -988,14 +1104,15 @@ async function start(){
      fetch("guest-catalog.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("Catalog unavailable");return r.json();}),
      api({action:"guest"})
    ]);
-   access.confirm();
+   // Remember this person on the device automatically once the server confirms the link.
+   access.confirm(data);
+   sessionEnded=false;
    catalog=items;loadFamilySnapshot(data);notice("");
    void metadataPromise.then(applySearchMetadata);
    void detailsPromise.then(applyPatternDetails);
  }catch(error){
    if(error.status===401){
-     access.invalidate();
-     showAccessHelp(REVOKED_MESSAGE);
+     showRejectedLink(error.info);
    }else{
      showAccessHelp("The family gallery could not connect. Your private link has not been cleared. Try again.",true);
    }
